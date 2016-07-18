@@ -44,7 +44,7 @@ function check_queue() {
   receipt=$(echo $msg | jq -r ".Messages[].ReceiptHandle")
   sceneid=$(echo $msg | jq -r ".Messages[].Body")
 
-  su planet -c "/usr/local/src/landsat-ingestor-stack/scripts/download $sceneid" \
+  su landsat -c "/usr/local/src/landsat-ingestor-stack/scripts/download $sceneid" \
     && delete_message $receipt \
     || restore_message $receipt
 }
