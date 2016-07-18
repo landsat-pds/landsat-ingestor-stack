@@ -1,0 +1,470 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Transfer L8 scenes on a periodic basis from USGS to S3 (landsat-pds).",
+  "Parameters": {
+    "Name": {
+      "Description": "Name used throughout the Cloudformation stack for various resource (e.g. Lambda Function, SQS).",
+      "Type": "String"
+    },
+    "Owner": {
+      "Description": "Owner of this application within an organization.",
+      "Type": "String"
+    },
+    "USGSUsername": {
+      "Type": "String",
+      "Description": "The username of a USGS account with machine-to-machine privileges."
+    },
+    "USGSPassword": {
+      "Type": "String",
+      "Description": "The password associated with USGSUsername."
+    }
+  },
+  "Resources": {
+    "ScheduledRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "This event periodically triggers a Lambda function that is responsible for searching USGS for new Landsat 8 scenes.",
+        "ScheduleExpression": "rate(1 minute)",
+        "State": "DISABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "PollUSGSLambda",
+                "Arn"
+              ]
+            },
+            "Id": "TargetFunction"
+          }
+        ]
+      }
+    },
+    "PermissionForEventsToInvokeLambda": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "PollUSGSLambda"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ScheduledRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "PollUSGSLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "pl-amit",
+          "S3Key": "lambda/poll-usgs.zip"
+        },
+        "Description": "Query USGS for new L8 scenes and populate a queue with scene ids.",
+        "FunctionName": {
+          "Ref": "Name"
+        },
+        "Handler": "handler.main",
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaExecutionRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "python2.7",
+        "Timeout": 300
+      }
+    },
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "LambdaLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "LambdaQueue",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage",
+                    "sqs:SendMessageBatch"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "LandsatQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "LandsatQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Ref": "Name"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": 600,
+        "RedrivePolicy": {
+          "maxReceiveCount": 5,
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "DeadLetterQueue",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "DeadLetterQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Name"
+              },
+              "-dead-letter"
+            ]
+          ]
+        },
+        "MessageRetentionPeriod": 1209600
+      }
+    },
+    "InstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "LandsatQueue",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:ChangeMessageVisibility"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "LandsatQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "LandsatPDSBucket",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    "arn:aws:s3:::landsat-pds",
+                    "arn:aws:s3:::landsat-pds/*"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "InstanceRole"
+          }
+        ]
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow SSH connection to instances. SSH keys are enforced during instance setup.",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 22,
+            "ToPort": 22
+          }
+        ]
+      }
+    },
+    "LaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "SecurityGroup"
+          }
+        ],
+        "ImageId": "ami-9dbea4fc",
+        "InstanceType": "m1.medium",
+        "SpotPrice": "0.06",
+        "InstanceMonitoring": "false",
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "\n",
+              [
+                "#!/usr/bin/env bash",
+                "set -ex",
+                "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1",
+                "apt-get update",
+                "apt-get -y --force-yes install git curl parallel jq htop",
+                "mkdir -p /usr/local/src/ && cd /usr/local/src/",
+                "echo -e \"Host github.com\n\tStrictHostKeyChecking no\n\" >> ~/.ssh/config",
+                "git clone https://github.com/mapbox/commonsec.git",
+                "bash /usr/local/src/commonsec/bin/setup.bash -p 22 -u landsat",
+                "git clone https://github.com/landsat-pds/landsat-ingestor-stack.git",
+                "cp /usr/local/src/landsat-ingestor-stack/scripts/*.conf /etc/init/",
+                "curl https://gist.githubusercontent.com/kapadia/a02c8fbb3a6a22b7b1e0/raw/authorized_keys -o /home/landsat/.ssh/authorized_keys",
+                "curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3-latest-Linux-x86_64.sh",
+                "su - landsat -c \"bash /usr/local/src/Miniconda3-latest-Linux-x86_64.sh -b\"",
+                "su - landsat -c \"/home/landsat/miniconda3/bin/pip install usgs\"",
+                "su - landsat -c \"/home/landsat/miniconda3/bin/pip install awscli\"",
+                "echo \"export PATH=/home/landsat/miniconda3/bin:$PATH\" >> /etc/profile.d/worker.sh",
+                "echo \"export AWS_DEFAULT_REGION=us-west-2\" >> /etc/profile.d/worker.sh",
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "echo \"export USGS_USERNAME=",
+                      {
+                        "Ref": "USGSUsername"
+                      },
+                      "\" >> /etc/profile.d/worker.sh"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "echo \"export USGS_PASSWORD=",
+                      {
+                        "Ref": "USGSPassword"
+                      },
+                      "\" >> /etc/profile.d/worker.sh"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "echo \"export SQS_URL=https://sqs.us-west-2.amazonaws.com/",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      "/",
+                      {
+                        "Ref": "Name"
+                      },
+                      "\" >> /etc/profile.d/worker.sh"
+                    ]
+                  ]
+                },
+                "chown landsat /mnt",
+                "start queue"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "AutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": [
+          "us-west-2a",
+          "us-west-2b",
+          "us-west-2c"
+        ],
+        "LaunchConfigurationName": {
+          "Ref": "LaunchConfiguration"
+        },
+        "MinSize": "0",
+        "MaxSize": "5",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "Name"
+            },
+            "PropagateAtLaunch": "true"
+          },
+          {
+            "Key": "Application",
+            "Value": {
+              "Ref": "Name"
+            },
+            "PropagateAtLaunch": "true"
+          },
+          {
+            "Key": "Owner",
+            "Value": {
+              "Ref": "Owner"
+            },
+            "PropagateAtLaunch": "true"
+          }
+        ]
+      }
+    },
+    "WorkerScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ExactCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "AutoScalingGroup"
+        },
+        "ScalingAdjustment": "5"
+      }
+    },
+    "WorkerScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ExactCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "AutoScalingGroup"
+        },
+        "Cooldown": "60",
+        "ScalingAdjustment": "0"
+      }
+    },
+    "PopulatedQueueAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Alarm if queue has any messages.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "LandsatQueue",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": "300",
+        "EvaluationPeriods": "1",
+        "Threshold": "0",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "AlarmActions": [
+          {
+            "Ref": "WorkerScaleUpPolicy"
+          }
+        ]
+      }
+    },
+    "EmptyQueueAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Alarm if queue no messages.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "NumberOfEmptyReceives",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "LandsatQueue",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": "300",
+        "EvaluationPeriods": "1",
+        "Threshold": "10",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "AlarmActions": [
+          {
+            "Ref": "WorkerScaleDownPolicy"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+#!/bin/bash
+source /etc/profile
+set -eou pipefail
+ 
+ 
+function usage() {
+  echo ""
+  echo "Download a Landsat scene from USGS."
+  echo ""
+  echo "Usage: ./download [scene id]"
+  echo ""
+}
+
+
+sceneid=${1:-}
+
+
+if [[ -z $sceneid ]]; then
+  usage;
+  exit 1;
+fi
+
+
+function onerror() {
+  rm -f /mnt/$sceneid.tar.gz
+  sleep $[ $RANDOM % 10 + 1]s
+  exit 1
+}
+trap onerror EXIT
+ 
+ 
+function download_landsat() {
+  local sceneid=$1
+
+  echo "Requesting a download url for $sceneid"
+  url=$(usgs download-url --node EE LANDSAT_8 $sceneid --product STANDARD)
+
+  echo "Downloading $sceneid"
+  dstpath=/mnt/$sceneid.tar.gz
+  curl --silent --fail "$url" -o "$dstpath"
+
+  echo "Copying $sceneid to $dstpath"
+  aws s3 cp $dstpath s3://landsat-pds/tarq/
+
+  rm -f $dstpath
+}
+ 
+download_landsat $sceneid
+ 
+trap - EXIT
+exit 0

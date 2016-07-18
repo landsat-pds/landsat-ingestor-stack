@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "landsat-pds",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:Get*",
+        "s3:List*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::landsat-pds",
+        "arn:aws:s3:::landsat-pds/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::000000000000:root"
+      },
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::landsat-pds/*"
+    }
+  ]
+}
