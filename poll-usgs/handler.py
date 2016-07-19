@@ -12,6 +12,29 @@ def chunks(l):
         yield l[i:i+10]
 
 
+def create_path_row_tree(scenes):
+    """
+    Create a search tree using path/row as indices.
+    """
+    tree = {
+        '%03d' % p: {
+            '%03d' % r: []
+            for r in range(1, 249)
+        } for p in range(1, 234)
+    }
+
+    for s in scenes:
+        path, row = s[3:6], s[6:9]
+        tree[path][row].append(s)
+
+    return tree
+
+
+def in_scene_tree(scene, tree):
+    path, row = s[3:6], s[6:9]
+    return True if scene in tree[path][row] else False
+
+
 def get_scene_list():
     """
     Get the scene list hosted on landsat-pds. This will be used
@@ -62,7 +85,9 @@ def main(event, context):
 
     entity_ids = poll_usgs()
     scene_list = get_scene_list()
-    entity_ids = [ s for s in entity_ids if s not in scene_list ]
+
+    tree = create_path_row_tree(scene_list)
+    entity_ids = [ s for s in entity_ids if not in_scene_tree(s, tree) ]
 
     # Construct the SQS URL. The Cloudformation template defines same name
     # for this Lambda function and SQS.
