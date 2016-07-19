@@ -24,8 +24,8 @@
       "Type": "AWS::Events::Rule",
       "Properties": {
         "Description": "This event periodically triggers a Lambda function that is responsible for searching USGS for new Landsat 8 scenes.",
-        "ScheduleExpression": "rate(1 minute)",
-        "State": "DISABLED",
+        "ScheduleExpression": "cron(0 10,16 * * ? *)",
+        "State": "ENABLED",
         "Targets": [
           {
             "Arn": {
@@ -358,7 +358,7 @@
                   ]
                 },
                 "chown landsat /mnt",
-                "# start queue"
+                "start queue"
               ]
             ]
           }
