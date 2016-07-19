@@ -1,6 +1,6 @@
 
-import md5
 import gzip
+import hashlib
 from datetime import date, timedelta
 
 import requests
@@ -25,7 +25,7 @@ def get_scene_list():
             f.write(block)
 
     with gzip.open(scene_list_path, 'rb') as f:
-        scene_list = map(lambda s: s.split(',')[0], f.readlines())
+        scene_list = [ s.decode('utf-8').split(',')[0] for s in f.readlines() ]
     scene_list.pop(0)
 
     return scene_list
@@ -38,16 +38,16 @@ def poll_usgs():
     """
     L8_METADATA_URL = "http://landsat.usgs.gov/metadata_service/bulk_metadata_files/LANDSAT_8.csv"
 
-    output = ""
+    output = b""
     r = requests.get(L8_METADATA_URL, stream=True)
     for i, chunk in enumerate(r.iter_content(1024)):
         output += chunk
         if i == 1500:
             break
 
-    entries = output.split('\n')
+    entries = output.decode('utf-8').split('\n')
     entries.pop(0)
-    sceneids = map(lambda s: s.split(',')[0], entries)
+    sceneids = [ s.split(',')[0] for s in entries ]
 
     today = date.today()
     yesterday = today - timedelta(1)
@@ -75,7 +75,7 @@ def main(event, context):
     for chunk in chunks(entity_ids):
         entries = [
             {
-                "Id": md5.new(entity_id).hexdigest()[0:6],
+                "Id": hashlib.md5(entity_id).hexdigest()[0:6],
                 "MessageBody": entity_id
             }
             for entity_id in chunk
