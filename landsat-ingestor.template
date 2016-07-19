@@ -358,7 +358,7 @@
                   ]
                 },
                 "chown landsat /mnt",
-                "start queue"
+                "# start queue"
               ]
             ]
           }
@@ -442,7 +442,7 @@
           }
         ],
         "Statistic": "Sum",
-        "Period": "300",
+        "Period": "60",
         "EvaluationPeriods": "1",
         "Threshold": "0",
         "ComparisonOperator": "GreaterThanThreshold",
