@@ -31,7 +31,7 @@ def create_path_row_tree(scenes):
 
 
 def in_scene_tree(scene, tree):
-    path, row = s[3:6], s[6:9]
+    path, row = scene[3:6], scene[6:9]
     return True if scene in tree[path][row] else False
 
 
