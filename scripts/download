@@ -40,7 +40,7 @@ function download_landsat() {
   curl --silent --fail "$url" -o "$dstpath"
 
   echo "Copying $sceneid to $dstpath"
-  aws s3 cp $dstpath s3://landsat-pds/tarq/
+  aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
 
   rm -f $dstpath
 }

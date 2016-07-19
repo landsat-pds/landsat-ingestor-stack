@@ -57,6 +57,7 @@
     },
     "PollUSGSLambda": {
       "Type": "AWS::Lambda::Function",
+      "DependsOn" : "LambdaExecutionRole",
       "Properties": {
         "Code": {
           "S3Bucket": "pl-amit",
@@ -225,7 +226,8 @@
                   "Action": [
                     "s3:GetObject",
                     "s3:ListBucket",
-                    "s3:PutObject"
+                    "s3:PutObject",
+                    "s3:PutObjectAcl"
                   ],
                   "Resource": [
                     "arn:aws:s3:::landsat-pds",
