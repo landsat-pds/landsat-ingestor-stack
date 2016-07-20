@@ -1,7 +1,6 @@
 
 import gzip
 import hashlib
-from datetime import date, timedelta
 
 import requests
 import boto3
@@ -65,20 +64,17 @@ def poll_usgs():
     r = requests.get(L8_METADATA_URL, stream=True)
     for i, chunk in enumerate(r.iter_content(1024)):
         output += chunk
-        if i == 1500:
+
+        # Read approximately 5MB of the CSV. This is roughly 14 days
+        # of scenes. Being liberal with the date range allows us to
+        # pick up any scenes that might have been accidently skipped
+        # over the last ~2 weeks.
+        if i == 5000:
             break
 
     entries = output.decode('utf-8').split('\n')
     entries.pop(0)
-    sceneids = [ s.split(',')[0] for s in entries ]
-
-    today = date.today()
-    yesterday = today - timedelta(1)
-    year = str(yesterday.timetuple().tm_year)
-    doy = str(yesterday.timetuple().tm_yday)
-
-    criterion = year + doy
-    return [ s for s in sceneids if criterion in s ]
+    return [ s.split(',')[0] for s in entries ]
 
 
 def main(event, context):
