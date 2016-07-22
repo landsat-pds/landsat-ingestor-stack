@@ -1,6 +1,7 @@
 
 import gzip
 import hashlib
+import logging
 
 import requests
 import boto3
@@ -84,6 +85,7 @@ def main(event, context):
 
     tree = create_path_row_tree(scene_list)
     entity_ids = [ s for s in entity_ids if not in_scene_tree(s, tree) ]
+    logging.info("Queuing %d scenes to ingest" % len(entity_ids))
 
     # Construct the SQS URL. The Cloudformation template defines same name
     # for this Lambda function and SQS.
