@@ -15,27 +15,24 @@ def chunks(l):
         yield l[i:i+10]
 
 
-def create_path_row_tree(scenes):
-    """
-    Create a search tree using path/row as indices.
-    """
-    tree = {
-        '%03d' % p: {
-            '%03d' % r: []
-            for r in range(1, 249)
-        } for p in range(1, 234)
-    }
+class SceneTree(object):
 
-    for s in scenes:
-        path, row = s[3:6], s[6:9]
-        tree[path][row].append(s)
+    def __init__(self, scene_list):
 
-    return tree
+        self.data = {
+            '%03d' % p: {
+                '%03d' % r: []
+                for r in range(1, 249)
+            } for p in range(1, 234)
+        }
 
+        for s in scene_list:
+            path, row = s[3:6], s[6:9]
+            self.data[path][row].append(s)
 
-def in_scene_tree(scene, tree):
-    path, row = scene[3:6], scene[6:9]
-    return True if scene in tree[path][row] else False
+    def __contains__(self, scene):
+        path, row = scene[3:6], scene[6:9]
+        return True if scene in self.data[path][row] else False
 
 
 def get_scene_list():
@@ -86,8 +83,8 @@ def main(event, context):
     entity_ids = poll_usgs()
     scene_list = get_scene_list()
 
-    tree = create_path_row_tree(scene_list)
-    entity_ids = [ s for s in entity_ids if not in_scene_tree(s, tree) ]
+    tree = SceneTree(scene_list)
+    entity_ids = [ s for s in entity_ids if s not in tree ]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
 
     # Construct the SQS URL. The Cloudformation template defines same name
