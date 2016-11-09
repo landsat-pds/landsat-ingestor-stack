@@ -20,33 +20,43 @@ trap onerror EXIT
 
 
 function delete_message() {
-  local receipt=$1
+  local receipt=$1; queue_url=$2;
+
   echo "Deleting message $receipt"
-  aws sqs delete-message --queue-url $SQS_URL --receipt-handle $receipt
+  aws sqs delete-message --queue-url $queue_url --receipt-handle $receipt
 }
 
 
 function restore_message() {
-  local receipt=$1
+  local receipt=$1; queue_url=$2;
+
   echo "Restoring message $receipt"
-  aws sqs change-message-visibility --queue-url $SQS_URL --receipt-handle $receipt --visibility-timeout 0
+  aws sqs change-message-visibility --queue-url $queue_url --receipt-handle $receipt --visibility-timeout 0
 }
 
 
 function check_queue() {
 
   msg=$(aws sqs receive-message --queue-url $SQS_URL)
+  queue_url=$SQS_URL
 
   if [ -z "$msg" ]; then
-    return 0
+
+    # Check if the archive queue has work
+    msg=$(aws sqs receive-message --queue-url $SQS_ARCHIVE_URL)
+    queue_url=$SQS_ARCHIVE_URL
+
+    if [ -z "$msg" ]; then
+      return 0
+    fi
   fi
 
   receipt=$(echo $msg | jq -r ".Messages[].ReceiptHandle")
   sceneid=$(echo $msg | jq -r ".Messages[].Body")
 
   su landsat -c "/usr/local/src/landsat-ingestor-stack/scripts/download $sceneid" \
-    && delete_message $receipt \
-    || restore_message $receipt
+    && delete_message $receipt $queue_url \
+    || restore_message $receipt $queue_url
 }
 
 check_queue

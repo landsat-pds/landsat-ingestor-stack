@@ -347,6 +347,20 @@
                   "Fn::Join": [
                     "",
                     [
+                      "echo \"export SQS_ARCHIVE_URL=https://sqs.us-west-2.amazonaws.com/",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      "/",
+                      "landsat-ingestor-archive",
+                      "\" >> /etc/profile.d/worker.sh"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
                       "su - landsat -c \"/home/landsat/miniconda3/bin/usgs login ",
                       {
                         "Ref": "USGSUsername"
