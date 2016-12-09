@@ -59,7 +59,7 @@ def poll_usgs():
     Poll the bulk metadata file for recent scenes. Only
     a portion of the file is downloaded.
     """
-    L8_METADATA_URL = "http://landsat.usgs.gov/metadata_service/bulk_metadata_files/LANDSAT_8.csv"
+    L8_METADATA_URL = "https://landsat.usgs.gov/landsat/metadata_service/bulk_metadata_files/LANDSAT_8.csv"
 
     output = b""
     r = requests.get(L8_METADATA_URL, stream=True)
