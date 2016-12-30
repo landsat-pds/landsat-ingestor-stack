@@ -75,8 +75,7 @@ def poll_usgs():
 
     entries = output.decode('utf-8').split('\n')
     entries.pop(0)
-    entries.pop()
-    return [ s.split(',')[0] for s in entries ]
+    return [ s.split(',')[2] for s in entries ]
 
 
 def main(event, context):
