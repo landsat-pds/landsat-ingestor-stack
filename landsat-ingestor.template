@@ -76,7 +76,17 @@
           ]
         },
         "Runtime": "python2.7",
-        "Timeout": 300
+        "Timeout": 300,
+        "Environment": {
+          "Variables": {
+            "USGS_USERNAME": {
+              "Ref": "USGSUsername"
+            },
+            "USGS_PASSWORD": {
+              "Ref": "USGSPassword"
+            }
+          }
+        }
       }
     },
     "LambdaExecutionRole": {

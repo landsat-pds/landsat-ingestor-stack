@@ -1,10 +1,15 @@
+#!/usr/bin/env python
 
+import os
 import gzip
 import hashlib
 import logging
+from datetime import datetime, timedelta
 
 import requests
 import boto3
+
+from usgs import api
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -17,7 +22,18 @@ def chunks(l):
 
 class SceneTree(object):
 
-    def __init__(self, scene_list):
+    def __init__(self):
+
+        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/scene_list.gz'
+        scene_list_path = '/tmp/scene_list.gz'
+        with open(scene_list_path, 'wb') as f:
+            r = requests.get(SCENE_LIST_URL, stream=True)
+            for block in r.iter_content(1024):
+                f.write(block)
+
+        with gzip.open(scene_list_path, 'rb') as f:
+            scene_list = [ s.decode('utf-8').split(',')[0] for s in f.readlines() ]
+        scene_list.pop(0)
 
         self.data = {
             '%03d' % p: {
@@ -35,55 +51,28 @@ class SceneTree(object):
         return True if scene in self.data[path][row] else False
 
 
-def get_scene_list():
-    """
-    Get the scene list hosted on landsat-pds. This will be used
-    to ensure scenes are not ingested more than once.
-    """
-    SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/scene_list.gz'
-    scene_list_path = '/tmp/scene_list.gz'
-    with open(scene_list_path, 'wb') as f:
-        r = requests.get(SCENE_LIST_URL, stream=True)
-        for block in r.iter_content(1024):
-            f.write(block)
-
-    with gzip.open(scene_list_path, 'rb') as f:
-        scene_list = [ s.decode('utf-8').split(',')[0] for s in f.readlines() ]
-    scene_list.pop(0)
-
-    return scene_list
-
-
 def poll_usgs():
-    """
-    Poll the bulk metadata file for recent scenes. Only
-    a portion of the file is downloaded.
-    """
-    L8_METADATA_URL = "https://landsat.usgs.gov/landsat/metadata_service/bulk_metadata_files/LANDSAT_8.csv"
 
-    output = b""
-    r = requests.get(L8_METADATA_URL, stream=True)
-    for i, chunk in enumerate(r.iter_content(1024)):
-        output += chunk
+    api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)
 
-        # Read approximately 5MB of the CSV. This is roughly 14 days
-        # of scenes. Being liberal with the date range allows us to
-        # pick up any scenes that might have been accidently skipped
-        # over the last ~2 weeks.
-        if i == 5000:
-            break
+    now = datetime.now()
+    fmt = '%Y%m%d'
 
-    entries = output.decode('utf-8').split('\n')
-    entries.pop(0)
-    return [ s.split(',')[2] for s in entries ]
+    start_date = (now - timedelta(days=2)).strftime(fmt)
+    end_date = now.strftime(fmt)
+
+    scenes = api.search('LANDSAT_8', 'EE', start_date=start_date, end_date=end_date, api_key=api_key)
+
+    return [
+        scene['displayId'] for scene in scenes
+    ]
 
 
 def main(event, context):
 
     entity_ids = poll_usgs()
-    scene_list = get_scene_list()
 
-    tree = SceneTree(scene_list)
+    tree = SceneTree()
     entity_ids = [ s for s in entity_ids if s not in tree ]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
 

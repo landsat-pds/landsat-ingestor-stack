@@ -1,23 +1,24 @@
 
 LAMBDA_DIR := $(CURDIR)/poll-usgs
 LAMBDA_S3_URL := s3://pl-amit/lambda/poll-usgs.zip
-STACK_NAME := landsat-ingestor
+STACK_NAME := landsat-ingestor-archive
 TIMESTAMP := $(shell date +"%Y%m%d%H%M%S")
-TEMPLATE_S3_URL = s3://pl-amit/templates/$(STACK_NAME)-$(TIMESTAMP).template
-TEMPLATE_PUBLIC_URL = https://pl-amit.s3.amazonaws.com/templates/$(STACK_NAME)-$(TIMESTAMP).template
+TEMPLATE_S3_URL = s3://pl-amit/templates/landsat-ingestor-$(TIMESTAMP).template
+TEMPLATE_PUBLIC_URL = https://pl-amit.s3.amazonaws.com/templates/landsat-ingestor-$(TIMESTAMP).template
 OWNER := amitkapadia
 
 
 lambda:
 	pip install requests -t $(LAMBDA_DIR)
+	pip install usgs -t $(LAMBDA_DIR)
 	cd $(LAMBDA_DIR); zip -r poll-usgs.zip .;
 	aws s3 cp $(LAMBDA_DIR)/poll-usgs.zip $(LAMBDA_S3_URL)
 	rm $(LAMBDA_DIR)/poll-usgs.zip
 
 cloudformation:
-	@aws s3 cp $(STACK_NAME).template $(TEMPLATE_S3_URL) --acl public-read
+	@aws s3 cp landsat-ingestor.template $(TEMPLATE_S3_URL) --acl public-read
 	@aws cloudformation create-stack \
-		--stack-name landsat-ingestor-$(TIMESTAMP) \
+		--stack-name $(STACK_NAME)-$(TIMESTAMP) \
 		--template-url $(TEMPLATE_PUBLIC_URL) \
 		--parameters \
 			ParameterKey=Name,ParameterValue=$(STACK_NAME) \
