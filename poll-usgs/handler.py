@@ -55,7 +55,7 @@ class SceneTree(object):
 
 def poll_usgs():
 
-    api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)
+    api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)['data']
 
     now = datetime.now()
     fmt = '%Y%m%d'

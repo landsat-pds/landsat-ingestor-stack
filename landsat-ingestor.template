@@ -61,7 +61,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "pl-amit",
-          "S3Key": "lambda/poll-usgs.zip"
+          "S3Key": "lambda/poll-usgs-collections.zip"
         },
         "Description": "Query USGS for new L8 scenes and populate a queue with scene ids.",
         "FunctionName": {
