@@ -33,13 +33,14 @@ function download_landsat() {
   local entityid=$1
 
   echo "Requesting a download url for $entityid"
-  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD)
+  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0]")
+  productid=$(echo "${url##*/}" | cut -d '.' -f1)
 
-  echo "Downloading $entityid"
-  dstpath=/mnt/$entityid.tar.gz
+  echo "Downloading $productid"
+  dstpath=/mnt/$productid.tar.gz
   curl --silent --fail "$url" -o "$dstpath"
 
-  echo "Copying $entityid to $dstpath"
+  echo "Copying $productid to s3://landsat-pds/tarq/$productid"
   aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
 
   rm -f $dstpath
