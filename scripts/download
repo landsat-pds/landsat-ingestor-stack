@@ -7,22 +7,22 @@ function usage() {
   echo ""
   echo "Download a Landsat scene from USGS."
   echo ""
-  echo "Usage: ./download [scene id]"
+  echo "Usage: ./download [entity id]"
   echo ""
 }
 
 
-sceneid=${1:-}
+entityid=${1:-}
 
 
-if [[ -z $sceneid ]]; then
+if [[ -z $entityid ]]; then
   usage;
   exit 1;
 fi
 
 
 function onerror() {
-  rm -f /mnt/$sceneid.tar.gz
+  rm -f /mnt/entityid.tar.gz
   sleep $[ $RANDOM % 10 + 1]s
   exit 1
 }
@@ -30,22 +30,22 @@ trap onerror EXIT
  
  
 function download_landsat() {
-  local sceneid=$1
+  local entityid=$1
 
-  echo "Requesting a download url for $sceneid"
-  url=$(usgs download-url --node EE LANDSAT_8 $sceneid --product STANDARD)
+  echo "Requesting a download url for $entityid"
+  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD)
 
-  echo "Downloading $sceneid"
-  dstpath=/mnt/$sceneid.tar.gz
+  echo "Downloading $entityid"
+  dstpath=/mnt/$entityid.tar.gz
   curl --silent --fail "$url" -o "$dstpath"
 
-  echo "Copying $sceneid to $dstpath"
+  echo "Copying $entityid to $dstpath"
   aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
 
   rm -f $dstpath
 }
  
-download_landsat $sceneid
+download_landsat $entityid
  
 trap - EXIT
 exit 0
