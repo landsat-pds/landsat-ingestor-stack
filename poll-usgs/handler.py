@@ -22,9 +22,10 @@ def chunks(l):
 
 class SceneTree(object):
 
+
     def __init__(self):
 
-        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/scene_list.gz'
+        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/c1/L8/scene_list.gz'
         scene_list_path = '/tmp/scene_list.gz'
         with open(scene_list_path, 'wb') as f:
             r = requests.get(SCENE_LIST_URL, stream=True)
@@ -43,11 +44,12 @@ class SceneTree(object):
         }
 
         for s in scene_list:
-            path, row = s[3:6], s[6:9]
+            path, row = s[10:13], s[13:16]
             self.data[path][row].append(s)
 
+
     def __contains__(self, scene):
-        path, row = scene[3:6], scene[6:9]
+        path, row = scene[10:13], scene[13:16]
         return True if scene in self.data[path][row] else False
 
 
@@ -58,13 +60,18 @@ def poll_usgs():
     now = datetime.now()
     fmt = '%Y%m%d'
 
-    start_date = (now - timedelta(days=2)).strftime(fmt)
+    start_date = (now - timedelta(days=7)).strftime(fmt)
     end_date = now.strftime(fmt)
 
-    scenes = api.search('LANDSAT_8', 'EE', start_date=start_date, end_date=end_date, api_key=api_key)
+    where = {
+        20510: 'T1' # This field id represents the Collection Category
+    }
+    result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
 
+    # Strangely, the entity id is still used to obtain a download url.
     return [
-        scene['displayId'] for scene in scenes
+        scene['entityId']
+        for scene in result['data']['results']
     ]
 
 
@@ -72,6 +79,8 @@ def main(event, context):
 
     entity_ids = poll_usgs()
 
+    # TODO: Figure out whether the SceneTree will need to support the product id or the entity id
+    #       this depends on whether the entity id is written into the scene list.
     tree = SceneTree()
     entity_ids = [ s for s in entity_ids if s not in tree ]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
