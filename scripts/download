@@ -33,7 +33,7 @@ function download_landsat() {
   local sceneid=$1
 
   echo "Requesting a download url for $sceneid"
-  url=$(usgs download-url --node EE LANDSAT_8 $sceneid --product STANDARD)
+  url=$(usgs download-url --node EE LANDSAT_8 $sceneid --product STANDARD | jq -r ".data[0]")
 
   echo "Downloading $sceneid"
   dstpath=/mnt/$sceneid.tar.gz
