@@ -7,22 +7,23 @@ function usage() {
   echo ""
   echo "Download a Landsat scene from USGS."
   echo ""
-  echo "Usage: ./download [scene id]"
+  echo "Usage: ./download [entity id]"
   echo ""
 }
 
 
-sceneid=${1:-}
+entityid=${1:-}
+: "${Collection:=False}"
 
 
-if [[ -z $sceneid ]]; then
+if [[ -z $entityid ]]; then
   usage;
   exit 1;
 fi
 
 
 function onerror() {
-  rm -f /mnt/$sceneid.tar.gz
+  rm -f /mnt/entityid.tar.gz
   sleep $[ $RANDOM % 10 + 1]s
   exit 1
 }
@@ -30,22 +31,28 @@ trap onerror EXIT
  
  
 function download_landsat() {
-  local sceneid=$1
+  local entityid=$1
+  echo "Collection is ${Collection}"
 
-  echo "Requesting a download url for $sceneid"
-  url=$(usgs download-url --node EE LANDSAT_8 $sceneid --product STANDARD | jq -r ".data[0]")
+  if [ $Collection = "False" ]; then
+    url=$(usgs download-url --node EE LANDSAT_8 $entityid --product STANDARD | jq -r ".data[0]")
+    dstpath=/mnt/$entityid.tar.gz
+  else
+    url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0]")
+    productid=$(echo "${url##*/}" | cut -d '.' -f1)
+    dstpath=/mnt/$productid.tar.gz
+  fi
 
-  echo "Downloading $sceneid"
-  dstpath=/mnt/$sceneid.tar.gz
+  echo "Downloading $entityid from $url"
   curl --silent --fail "$url" -o "$dstpath"
 
-  echo "Copying $sceneid to $dstpath"
+  echo "Copying $entityid to s3://landsat-pds/tarq/"
   aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
 
   rm -f $dstpath
 }
  
-download_landsat $sceneid
+download_landsat $entityid
  
 trap - EXIT
 exit 0

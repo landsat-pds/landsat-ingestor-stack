@@ -22,9 +22,10 @@ def chunks(l):
 
 class SceneTree(object):
 
+
     def __init__(self):
 
-        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/scene_list.gz'
+        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/c1/L8/scene_list.gz'
         scene_list_path = '/tmp/scene_list.gz'
         with open(scene_list_path, 'wb') as f:
             r = requests.get(SCENE_LIST_URL, stream=True)
@@ -32,7 +33,7 @@ class SceneTree(object):
                 f.write(block)
 
         with gzip.open(scene_list_path, 'rb') as f:
-            scene_list = [ s.decode('utf-8').split(',')[0] for s in f.readlines() ]
+            scene_list = [ s.decode('utf-8').split(',')[1] for s in f.readlines() ]
         scene_list.pop(0)
 
         self.data = {
@@ -46,6 +47,7 @@ class SceneTree(object):
             path, row = s[3:6], s[6:9]
             self.data[path][row].append(s)
 
+
     def __contains__(self, scene):
         path, row = scene[3:6], scene[6:9]
         return True if scene in self.data[path][row] else False
@@ -53,18 +55,23 @@ class SceneTree(object):
 
 def poll_usgs():
 
-    api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)
+    api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)['data']
 
     now = datetime.now()
     fmt = '%Y%m%d'
 
-    start_date = (now - timedelta(days=2)).strftime(fmt)
+    start_date = (now - timedelta(days=7)).strftime(fmt)
     end_date = now.strftime(fmt)
 
-    scenes = api.search('LANDSAT_8', 'EE', start_date=start_date, end_date=end_date, api_key=api_key)
+    where = {
+        20510: 'T1' # This field id represents the Collection Category
+    }
+    result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
 
+    # Strangely, the entity id is still used to obtain a download url.
     return [
-        scene['displayId'] for scene in scenes
+        scene['entityId']
+        for scene in result['data']['results']
     ]
 
 

@@ -17,6 +17,11 @@
     "USGSPassword": {
       "Type": "String",
       "Description": "The password associated with USGSUsername."
+    },
+    "Collection": {
+      "Type": "String",
+      "Description": "Get data from the Landsat 8 Collection.",
+      "Default": "True"
     }
   },
   "Resources": {
@@ -61,7 +66,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "pl-amit",
-          "S3Key": "lambda/poll-usgs.zip"
+          "S3Key": "lambda/poll-usgs-collections.zip"
         },
         "Description": "Query USGS for new L8 scenes and populate a queue with scene ids.",
         "FunctionName": {
@@ -313,6 +318,18 @@
                 "su - landsat -c \"/home/landsat/miniconda3/bin/pip install awscli\"",
                 "echo \"export PATH=/home/landsat/miniconda3/bin:$PATH\" >> /etc/profile.d/worker.sh",
                 "echo \"export AWS_DEFAULT_REGION=us-west-2\" >> /etc/profile.d/worker.sh",
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "echo \"export Collection=",
+                      {
+                        "Ref": "Collection"
+                      },
+                      "\" >> /etc/profile.d/worker.sh"
+                    ]
+                  ]
+                },
                 {
                   "Fn::Join": [
                     "",
