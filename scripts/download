@@ -13,6 +13,7 @@ function usage() {
 
 
 entityid=${1:-}
+: "${Collection:=False}"
 
 
 if [[ -z $entityid ]]; then
@@ -31,16 +32,21 @@ trap onerror EXIT
  
 function download_landsat() {
   local entityid=$1
+  echo "Collection is ${Collection}"
 
-  echo "Requesting a download url for $entityid"
-  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0]")
-  productid=$(echo "${url##*/}" | cut -d '.' -f1)
+  if [ $Collection = "False" ]; then
+    url=$(usgs download-url --node EE LANDSAT_8 $entityid --product STANDARD | jq -r ".data[0]")
+    dstpath=/mnt/$entityid.tar.gz
+  else
+    url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0]")
+    productid=$(echo "${url##*/}" | cut -d '.' -f1)
+    dstpath=/mnt/$productid.tar.gz
+  fi
 
-  echo "Downloading $productid"
-  dstpath=/mnt/$productid.tar.gz
+  echo "Downloading $entityid from $url"
   curl --silent --fail "$url" -o "$dstpath"
 
-  echo "Copying $productid to s3://landsat-pds/tarq/$productid"
+  echo "Copying $entityid to s3://landsat-pds/tarq/"
   aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
 
   rm -f $dstpath

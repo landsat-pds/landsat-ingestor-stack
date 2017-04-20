@@ -1,7 +1,8 @@
 
 LAMBDA_DIR := $(CURDIR)/poll-usgs
-LAMBDA_S3_URL := s3://pl-amit/lambda/poll-usgs.zip
-STACK_NAME := landsat-ingestor
+LAMBDA_S3_URL := s3://pl-amit/lambda/poll-usgs-collections.zip
+TEMPLATE_NAME := landsat-ingestor.template
+STACK_NAME := landsat-ingestor-collections
 TIMESTAMP := $(shell date +"%Y%m%d%H%M%S")
 TEMPLATE_S3_URL = s3://pl-amit/templates/landsat-ingestor-$(TIMESTAMP).template
 TEMPLATE_PUBLIC_URL = https://pl-amit.s3.amazonaws.com/templates/landsat-ingestor-$(TIMESTAMP).template
@@ -16,7 +17,7 @@ lambda:
 	rm $(LAMBDA_DIR)/poll-usgs.zip
 
 cloudformation:
-	@aws s3 cp $(STACK_NAME).template $(TEMPLATE_S3_URL) --acl public-read
+	@aws s3 cp $(TEMPLATE_NAME) $(TEMPLATE_S3_URL) --acl public-read
 	@aws cloudformation create-stack \
 		--stack-name $(STACK_NAME)-$(TIMESTAMP) \
 		--template-url $(TEMPLATE_PUBLIC_URL) \

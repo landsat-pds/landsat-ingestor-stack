@@ -33,7 +33,7 @@ class SceneTree(object):
                 f.write(block)
 
         with gzip.open(scene_list_path, 'rb') as f:
-            scene_list = [ s.decode('utf-8').split(',')[0] for s in f.readlines() ]
+            scene_list = [ s.decode('utf-8').split(',')[1] for s in f.readlines() ]
         scene_list.pop(0)
 
         self.data = {
@@ -44,12 +44,12 @@ class SceneTree(object):
         }
 
         for s in scene_list:
-            path, row = s[10:13], s[13:16]
+            path, row = s[3:6], s[6:9]
             self.data[path][row].append(s)
 
 
     def __contains__(self, scene):
-        path, row = scene[10:13], scene[13:16]
+        path, row = scene[3:6], scene[6:9]
         return True if scene in self.data[path][row] else False
 
 
@@ -79,8 +79,6 @@ def main(event, context):
 
     entity_ids = poll_usgs()
 
-    # TODO: Figure out whether the SceneTree will need to support the product id or the entity id
-    #       this depends on whether the entity id is written into the scene list.
     tree = SceneTree()
     entity_ids = [ s for s in entity_ids if s not in tree ]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
