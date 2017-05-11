@@ -18,10 +18,10 @@
       "Type": "String",
       "Description": "The password associated with USGSUsername."
     },
-    "Collection": {
+    "Tier": {
       "Type": "String",
-      "Description": "Get data from the Landsat 8 Collection.",
-      "Default": "True"
+      "Description": "The product tier that will be ingested (e.g. T1, T2, RT).",
+      "Default": "T1"
     }
   },
   "Resources": {
@@ -322,9 +322,9 @@
                   "Fn::Join": [
                     "",
                     [
-                      "echo \"export Collection=",
+                      "echo \"export TIER=",
                       {
-                        "Ref": "Collection"
+                        "Ref": "Tier"
                       },
                       "\" >> /etc/profile.d/worker.sh"
                     ]
