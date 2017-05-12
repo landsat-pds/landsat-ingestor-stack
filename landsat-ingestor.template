@@ -89,6 +89,9 @@
             },
             "USGS_PASSWORD": {
               "Ref": "USGSPassword"
+            },
+            "TIER": {
+              "Ref": "Tier"
             }
           }
         }
