@@ -54,19 +54,42 @@ class SceneTree(object):
 
 
 def poll_usgs():
-
+    """
+    Check whether USGS has made any new scenes available. In the case of RT scenes,
+    we check only a few days back. In the case of T1/T2 scenes we check 4 weeks back due to
+    processing latencies.
+    """
     api_key = api.login(os.environ['USGS_USERNAME'], os.environ['USGS_PASSWORD'], save=False)['data']
+    tier = os.environ['TIER']
 
     now = datetime.now()
-    fmt = '%Y%m%d'
+    fmt = '%Y-%m-%d'
 
-    start_date = (now - timedelta(days=7)).strftime(fmt)
-    end_date = now.strftime(fmt)
+    if (tier == 'RT'):
+        start_date = (now - timedelta(days=4)).strftime(fmt)
+        end_date = now.strftime(fmt)
+        dates = [(start_date, end_date)]
+    else:
+        dates = [
+            (
+                (now - timedelta(days=7 * (i + 1))).strftime(fmt),
+                (now - timedelta(days=7 * i)).strftime(fmt)
+            )
+            for i in range(4)
+        ]
 
+    # This field id represents the Collection Category
     where = {
-        20510: 'T1' # This field id represents the Collection Category
+        20510: tier
     }
-    result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
+
+    entityIds = []
+    for (start_date, end_date) in dates:
+        result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
+        entityIds += [
+            scene['entityId']
+            for scene in result['data']['results']
+        ]
 
     # Strangely, the entity id is still used to obtain a download url.
     return [
