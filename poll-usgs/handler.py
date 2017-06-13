@@ -32,8 +32,16 @@ class SceneTree(object):
             for block in r.iter_content(1024):
                 f.write(block)
 
+        tier = os.environ['TIER']
+
         with gzip.open(scene_list_path, 'rb') as f:
-            scene_list = [ s.decode('utf-8').split(',')[1] for s in f.readlines() ]
+            # Parse the scene_list CSV. Check the tier using the product id in the first
+            # column, and save the entity id in the second column.
+            scene_list = [
+                s.decode('utf-8').split(',')[1]
+                for s in f.readlines()
+                if s.decode('utf-8').split(',')[0].endswith(tier)
+            ]
         scene_list.pop(0)
 
         self.data = {
