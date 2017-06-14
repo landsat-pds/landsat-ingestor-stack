@@ -94,16 +94,14 @@ def poll_usgs():
     entityIds = []
     for (start_date, end_date) in dates:
         result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
+
+        # Strangely, the entity id is still used to obtain a download url.
         entityIds += [
             scene['entityId']
             for scene in result['data']['results']
         ]
 
-    # Strangely, the entity id is still used to obtain a download url.
-    return [
-        scene['entityId']
-        for scene in result['data']['results']
-    ]
+    return entityIds
 
 
 def main(event, context):
