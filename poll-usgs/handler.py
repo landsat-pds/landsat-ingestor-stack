@@ -109,7 +109,7 @@ def main(event, context):
     entity_ids = poll_usgs()
 
     tree = SceneTree()
-    entity_ids = set([ s for s in entity_ids if s not in tree ])
+    entity_ids = list(set([ s for s in entity_ids if s not in tree ]))
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
 
     # Construct the SQS URL. The Cloudformation template defines same name
