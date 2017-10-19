@@ -1,8 +1,9 @@
 
+TIER := T1
 LAMBDA_DIR := $(CURDIR)/poll-usgs
-LAMBDA_S3_URL := s3://pl-amit/lambda/poll-usgs-collections.zip
+LAMBDA_S3_URL := s3://pl-amit/lambda/poll-usgs.zip
 TEMPLATE_NAME := landsat-ingestor.template
-STACK_NAME := landsat-ingestor-collections
+STACK_NAME := landsat-ingestor-$(TIER)
 TIMESTAMP := $(shell date +"%Y%m%d%H%M%S")
 TEMPLATE_S3_URL = s3://pl-amit/templates/landsat-ingestor-$(TIMESTAMP).template
 TEMPLATE_PUBLIC_URL = https://pl-amit.s3.amazonaws.com/templates/landsat-ingestor-$(TIMESTAMP).template
@@ -26,6 +27,7 @@ cloudformation:
 			ParameterKey=Owner,ParameterValue=$(OWNER) \
 			ParameterKey=USGSUsername,ParameterValue=$(USGS_USERNAME) \
 			ParameterKey=USGSPassword,ParameterValue=$(USGS_PASSWORD) \
+			ParameterKey=Tier,ParameterValue=$(TIER) \
 		--capabilities CAPABILITY_IAM \
 		--region us-west-2
 
