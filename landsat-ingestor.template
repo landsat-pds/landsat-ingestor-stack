@@ -29,7 +29,7 @@
       "Type": "AWS::Events::Rule",
       "Properties": {
         "Description": "This event periodically triggers a Lambda function that is responsible for searching USGS for new Landsat 8 scenes.",
-        "ScheduleExpression": "cron(0 0,6,12,18 * * ? *)",
+        "ScheduleExpression": "rate(3 hours)",
         "State": "ENABLED",
         "Targets": [
           {
