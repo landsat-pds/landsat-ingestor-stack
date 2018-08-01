@@ -37,7 +37,10 @@ function download_landsat() {
   dstpath=/mnt/$productid.tar.gz
 
   echo "Downloading $entityid from $url"
+  t0=$(date +%s)
   curl --silent --fail "$url" -o "$dstpath"
+  t1=$(date +%s)
+  echo "Took $(($t1 - $t0)) seconds to download $entityid"
 
   echo "Copying $entityid to s3://landsat-pds/tarq/"
   aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
