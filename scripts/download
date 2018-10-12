@@ -32,7 +32,7 @@ trap onerror EXIT
 function download_landsat() {
   local entityid=$1
 
-  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0]")
+  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0].url")
   productid=$(echo "${url##*/}" | cut -d '.' -f1)
   dstpath=/mnt/$productid.tar.gz
 
