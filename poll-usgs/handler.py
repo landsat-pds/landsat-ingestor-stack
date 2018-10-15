@@ -19,46 +19,26 @@ def chunks(l):
     for i in range(0, len(l), 10):
         yield l[i:i+10]
 
+def get_scene_list():
+    SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/c1/L8/scene_list.gz'
+    scene_list_path = '/tmp/scene_list.gz'
+    with open(scene_list_path, 'wb') as f:
+        r = requests.get(SCENE_LIST_URL, stream=True)
+        for block in r.iter_content(1024):
+            f.write(block)
 
-class SceneTree(object):
+    tier = os.environ['TIER']
 
-
-    def __init__(self):
-
-        SCENE_LIST_URL = 'http://landsat-pds.s3.amazonaws.com/c1/L8/scene_list.gz'
-        scene_list_path = '/tmp/scene_list.gz'
-        with open(scene_list_path, 'wb') as f:
-            r = requests.get(SCENE_LIST_URL, stream=True)
-            for block in r.iter_content(1024):
-                f.write(block)
-
-        tier = os.environ['TIER']
-
-        with gzip.open(scene_list_path, 'rb') as f:
-            # Parse the scene_list CSV. Check the tier using the product id in the first
-            # column, and save the entity id in the second column.
-            scene_list = [
-                s.decode('utf-8').split(',')[1]
-                for s in f.readlines()
-                if s.decode('utf-8').split(',')[0].endswith(tier)
-            ]
-        scene_list.pop(0)
-
-        self.data = {
-            '%03d' % p: {
-                '%03d' % r: []
-                for r in range(1, 249)
-            } for p in range(1, 234)
-        }
-
-        for s in scene_list:
-            path, row = s[3:6], s[6:9]
-            self.data[path][row].append(s)
-
-
-    def __contains__(self, scene):
-        path, row = scene[3:6], scene[6:9]
-        return True if scene in self.data[path][row] else False
+    with gzip.open(scene_list_path, 'rb') as f:
+        # Parse the scene_list CSV. Check the tier using the product id in the first
+        # column, and save the entity id in the second column.
+        scene_list = [
+            s.decode('utf-8').split(',')[1]
+            for s in f.readlines()
+            if s.decode('utf-8').split(',')[0].endswith(tier)
+        ]
+    scene_list.pop(0)
+    return set(scene_list)
 
 
 def poll_usgs():
@@ -73,33 +53,22 @@ def poll_usgs():
     now = datetime.now()
     fmt = '%Y-%m-%d'
 
-    if (tier == 'RT'):
-        start_date = (now - timedelta(days=4)).strftime(fmt)
-        end_date = now.strftime(fmt)
-        dates = [(start_date, end_date)]
-    else:
-        dates = [
-            (
-                (now - timedelta(days=7 * (i + 1))).strftime(fmt),
-                (now - timedelta(days=7 * i)).strftime(fmt)
-            )
-            for i in range(4)
-        ]
+    days_prior = 4 if tier == 'RT' else 30
+    start_date = (now - timedelta(days=days_prior)).strftime(fmt)
+    end_date = now.strftime(fmt)
 
     # This field id represents the Collection Category
     where = {
         20510: tier
     }
 
-    entityIds = []
-    for (start_date, end_date) in dates:
-        result = api.search('LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
+    result = api.search(
+            'LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
 
-        # Strangely, the entity id is still used to obtain a download url.
-        entityIds += [
-            scene['entityId']
-            for scene in result['data']['results']
-        ]
+    # Strangely, the entity id is still used to obtain a download url.
+    entityIds = [
+        scene['entityId'] for scene in result['data']['results']
+    ]
 
     return entityIds
 
@@ -107,13 +76,19 @@ def poll_usgs():
 def main(event, context):
 
     entity_ids = poll_usgs()
+    logger.info("Found {} scenes for potential queuing.".format(len(entity_ids)))
+    print("Found {} scenes for potential queuing.".format(len(entity_ids)))
 
-    tree = SceneTree()
-    entity_ids = list(set([ s for s in entity_ids if s not in tree ]))
+    scene_list = get_scene_list()
+    logger.info("Found {} scenes that currently exist.".format(len(scene_list)))
+    print("Found {} scenes that currently exist.".format(len(scene_list)))
+
+    entity_ids = [s for s in entity_ids if s not in scene_list]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
+    print("Queuing %d scenes to ingest" % len(entity_ids))
 
-    # Construct the SQS URL. The Cloudformation template defines same name
-    # for this Lambda function and SQS.
+    Construct the SQS URL. The Cloudformation template defines same name
+    for this Lambda function and SQS.
     _, _, resource, region, account_id, _, name = context.invoked_function_arn.split(":")
     queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (region, account_id, name)
 
