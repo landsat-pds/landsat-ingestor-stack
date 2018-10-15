@@ -23,7 +23,7 @@ fi
 
 function onerror() {
   rm -f /mnt/entityid.tar.gz
-  sleep $[ $RANDOM % 10 + 1]s
+  sleep $[ $RANDOM % 20 + 1]s
   exit 1
 }
 trap onerror EXIT
