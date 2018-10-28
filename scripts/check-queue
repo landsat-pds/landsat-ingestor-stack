@@ -18,6 +18,7 @@ function onerror() {
 }
 trap onerror EXIT
 
+SQS_URL_ARCHIVE=${SQS_URL/$TIER/archive}
 
 function delete_message() {
   local receipt=$1
@@ -25,11 +26,22 @@ function delete_message() {
   aws sqs delete-message --queue-url $SQS_URL --receipt-handle $receipt
 }
 
+function delete_message_archive() {
+  local receipt=$1
+  echo "Deleting message $receipt"
+  aws sqs delete-message --queue-url $SQS_URL_ARCHIVE --receipt-handle $receipt
+}
 
 function restore_message() {
   local receipt=$1
   echo "Restoring message $receipt"
   aws sqs change-message-visibility --queue-url $SQS_URL --receipt-handle $receipt --visibility-timeout 0
+}
+
+function restore_message_archive() {
+  local receipt=$1
+  echo "Restoring message $receipt"
+  aws sqs change-message-visibility --queue-url $SQS_URL_ARCHIVE --receipt-handle $receipt --visibility-timeout 0
 }
 
 
@@ -38,6 +50,20 @@ function check_queue() {
   msg=$(aws sqs receive-message --queue-url $SQS_URL)
 
   if [ -z "$msg" ]; then
+    echo "No messages in the primary queue. Checking archive queue."
+    msg=$(aws sqs receive-message --queue-url $SQS_URL_ARCHIVE)
+
+    if [ -z "$msg" ]; then
+      return 0
+    fi
+
+    receipt=$(echo $msg | jq -r ".Messages[].ReceiptHandle")
+    sceneid=$(echo $msg | jq -r ".Messages[].Body")
+
+    su landsat -c "/usr/local/src/landsat-ingestor-stack/scripts/download $sceneid" \
+      && delete_message_archive $receipt \
+      || restore_message_archive $receipt
+
     return 0
   fi
 
