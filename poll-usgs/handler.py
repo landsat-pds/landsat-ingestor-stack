@@ -87,8 +87,8 @@ def main(event, context):
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
     print("Queuing %d scenes to ingest" % len(entity_ids))
 
-    Construct the SQS URL. The Cloudformation template defines same name
-    for this Lambda function and SQS.
+    # Construct the SQS URL. The Cloudformation template defines same name
+    # for this Lambda function and SQS.
     _, _, resource, region, account_id, _, name = context.invoked_function_arn.split(":")
     queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (region, account_id, name)
 
