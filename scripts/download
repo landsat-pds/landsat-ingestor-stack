@@ -42,8 +42,18 @@ function download_landsat() {
   t1=$(date +%s)
   echo "Took $(($t1 - $t0)) seconds to download $entityid"
 
-  echo "Copying $entityid to s3://landsat-pds/tarq/"
-  aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
+  # Drop archive into a different queue directory
+  # as a workaround of some internal issues
+  acquisition_date=$(echo $productid | cut -d '_' -f4)
+  acquisition_year=${acquisition_date:0:4}
+
+  if [ "$acquisition_year" -gt 2017 ]; then
+    echo "Copying $entityid to s3://landsat-pds/tarq/"
+    aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
+  else
+    echo "Copying $entityid to s3://landsat-pds/tarq_archive/"
+    aws s3 cp $dstpath s3://landsat-pds/tarq_archive/ --acl public-read
+  fi
 
   rm -f $dstpath
 }
