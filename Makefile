@@ -63,7 +63,7 @@ processor-cloudformation:
 
 processor-lambda:
 	cd $(PROCESSOR_LAMBDA_DIR); zip -r poll-s3.zip .;
-	aws s3 cp $(PROCESSOR_LAMBDA_DIR)/poll-s3.zip $(PROCESSOR_LAMBDA_S3_URL)
+	aws s3 cp $(PROCESSOR_LAMBDA_DIR)/poll-s3.zip $(PROCESSOR_LAMBDA_S3_URL) --acl public-read
 	rm $(PROCESSOR_LAMBDA_DIR)/poll-s3.zip
 
 clean:

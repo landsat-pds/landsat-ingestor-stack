@@ -198,6 +198,10 @@ def main(event, context):
             Key=RUN_INFO_KEY,
             Body=json.dumps(run_info)
         )
+
+        # TODO: Upload a new run CSV
+        # TODO: Append new entries to the scene_list
+
         return
 
     print("Run is active with job id of {}".format(array_job_id))

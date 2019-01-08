@@ -141,6 +141,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "s3:ListBucket",
                     "s3:GetObject",
                     "s3:PutObject",
                     "s3:PutObjectAcl",
@@ -330,20 +331,17 @@
             "Fn::Join": [
               "",
               [
-                "137112412989.dkr.ecr.",
+                "954867229964.dkr.ecr.",
                 {
                   "Ref": "AWS::Region"
                 },
-                ".amazonaws.com/amazonlinux:latest"
+                ".amazonaws.com/awsbatch:latest"
               ]
             ]
           },
           "Vcpus": 2,
           "Memory": 2000,
-          "Command": [
-            "echo",
-            "Hello world $AWS_BATCH_JOB_ARRAY_INDEX"
-          ]
+          "Command": []
         },
         "RetryStrategy": {
           "Attempts": 1
