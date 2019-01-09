@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -eou pipefail
+
+function main() {
+    wget -O run_list.txt https://landsat-pds.s3.amazonaws.com/run_list.txt
+    INDEX=$((AWS_BATCH_JOB_ARRAY_INDEX+1))
+    key=$(sed "${INDEX}q;d" run_list.txt)
+    echo "Processing ${key} from job ${AWS_BATCH_JOB_ARRAY_INDEX} in ${AWS_BATCH_JOB_ID}"
+
+    directory=$(echo $key | cut -d '/' -f 1)
+    filename=$(echo $key | cut -d '/' -f 2)
+    basename="${filename%%.*}"
+
+    python landsat_ingestor/ingestor/l8_process_scene.py \
+        --verbose \
+        --source s3queue \
+        --overwrite \
+        --list-file run.csv \
+        --no-delete-queue \
+        $basename
+    
+    cat run.csv
+}
+
+main
+
+exit 0
