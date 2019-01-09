@@ -186,6 +186,7 @@
                   "Effect": "Allow",
                   "Action": [
                     "s3:GetObject",
+                    "s3:GetObjectVersion",
                     "s3:PutObject",
                     "s3:PutObjectAcl",
                     "s3:DeleteObject"
@@ -331,7 +332,10 @@
             "Fn::Join": [
               "",
               [
-                "954867229964.dkr.ecr.",
+                {
+                  "Ref": "AWS::AccountId"
+                },
+                ".dkr.ecr.",
                 {
                   "Ref": "AWS::Region"
                 },
@@ -339,12 +343,15 @@
               ]
             ]
           },
-          "Vcpus": 2,
-          "Memory": 2000,
+          "Vcpus": 1,
+          "Memory": 500,
           "Command": []
         },
+        "Timeout": {
+          "AttemptDurationSeconds": 800
+        },
         "RetryStrategy": {
-          "Attempts": 1
+          "Attempts": 3
         }
       }
     },
@@ -368,6 +375,7 @@
         "Type": "MANAGED",
         "ComputeResources": {
           "Type": "EC2",
+          "BidPercentage": 40,
           "MinvCpus": 0,
           "DesiredvCpus": 0,
           "MaxvCpus": 64,
@@ -386,6 +394,11 @@
           ],
           "InstanceRole": {
             "Ref": "IamInstanceProfile"
+          },
+          "Tags": {
+            "Owner": {
+              "Ref": "Owner"
+            }
           }
         },
         "ServiceRole": {

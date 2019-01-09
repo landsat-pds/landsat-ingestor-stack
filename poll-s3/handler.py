@@ -24,6 +24,9 @@ def populate_queue():
               done, this function will fallback to s3://landsat-pds/tarq_archive
               to process the backlog.
     """
+    max_items = 4
+    # max_items = 5000
+
     paginator = s3.get_paginator('list_objects_v2')
     kwargs = {
         'Bucket': 'landsat-pds',
@@ -31,7 +34,7 @@ def populate_queue():
         'Prefix': 'tarq/',
         'FetchOwner': False,
         'PaginationConfig': {
-            'MaxItems': 5000,
+            'MaxItems': max_items,
             'PageSize': 1000
         }
     }
@@ -43,7 +46,7 @@ def populate_queue():
         if item['Key'].endswith('.tar.gz')
     ]
 
-    if len(items) < 5000:
+    if len(items) < max_items:
         # Check the tarq_archive directory
         kwargs['Prefix'] = 'tarq_archive/'
         response_iterator = paginator.paginate(**kwargs)
@@ -63,11 +66,10 @@ def populate_queue():
     response = s3.put_object(
         Bucket='landsat-pds',
         Key='run_list.txt',
-        Body='\n'.join(items)
+        Body='\n'.join(items),
+        ACL='public-read'
     )
 
-    # TODO: Get the job queue ARN and job definition ARN from environment variables
-    #       set up in the Cloudformation template.
     job_queue = os.environ.get('AWS_BATCH_JOB_QUEUE')
     job_definition = os.environ.get('AWS_BATCH_JOB_DEFINITION')
     response = batch.submit_job(
@@ -76,13 +78,7 @@ def populate_queue():
         arrayProperties={
             'size': len(items)
         },
-        jobDefinition=job_definition,
-        retryStrategy={
-            'attempts': 5
-        },
-        timeout={
-            'attemptDurationSeconds': 600
-        }
+        jobDefinition=job_definition
     )
 
     return response['jobId']
@@ -133,6 +129,9 @@ def is_batch_complete(array_job_id):
     completed_jobs = job_status_counts['SUCCEEDED'] + job_status_counts['FAILED']
 
     if completed_jobs == total_jobs:
+        if job_status_counts['FAILED'] > 0:
+            # TODO: Alert if any failures
+            pass
         return True
 
     return False

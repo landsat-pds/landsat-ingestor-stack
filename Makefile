@@ -59,7 +59,8 @@ processor-cloudformation:
 			ParameterKey=Name,ParameterValue=$(PROCESSOR_STACK_NAME) \
 			ParameterKey=Owner,ParameterValue=$(OWNER) \
 		--capabilities CAPABILITY_IAM \
-		--region us-west-2
+		--region us-west-2 \
+		--profile prod
 
 processor-lambda:
 	cd $(PROCESSOR_LAMBDA_DIR); zip -r poll-s3.zip .;
