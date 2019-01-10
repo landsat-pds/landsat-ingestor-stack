@@ -9,6 +9,40 @@ s3 = boto3.client('s3')
 # boto3.setup_default_session(profile_name='default', region_name='us-west-2')
 batch = boto3.client('batch')
 
+def aggregate_run(array_job_id):
+    """
+    After a run is complete, aggregate the results into a CSV file.
+    """
+    paginator = s3.get_paginator('list_objects_v2')
+    kwargs = {
+        'Bucket': 'landsat-pds',
+        'EncodingType': 'url',
+        'Prefix': '{}/'.format(array_job_id),
+        'FetchOwner': False,
+        'PaginationConfig': {
+            'MaxItems': 10000,
+            'PageSize': 1000
+        }
+    }
+    response_iterator = paginator.paginate(**kwargs)
+    rows = []
+    for page in response_iterator:
+        for item in page['Contents']:
+            if item['Key'].endswith('.csv'):
+                obj = s3.get_object(Bucket='landsat-pds', Key=item['Key'])
+                rows += [obj['Body'].read().split('\n')]
+
+    names, entries, _ = zip(*rows)
+    csv_list = [names[0]] + list(entries)
+    csv_str = "\n".join(csv_list)
+
+    print csv_str
+
+    # TODO: Delete objects using s3.delete_objects
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.delete_objects
+    # TODO: Upload run CSV file. This requires shutting down other service to avoid collisions.
+
+
 def populate_queue():
     """
     Incoming Landsat scenes are downloaded from USGS and stored in
@@ -46,15 +80,15 @@ def populate_queue():
         if item['Key'].endswith('.tar.gz')
     ]
 
-    if len(items) < max_items:
-        # Check the tarq_archive directory
-        kwargs['Prefix'] = 'tarq_archive/'
-        response_iterator = paginator.paginate(**kwargs)
-        items += [
-            item['Key']
-            for page in response_iterator
-            for item in page['Contents']
-        ]
+    # if len(items) < max_items:
+    #     # Check the tarq_archive directory
+    #     kwargs['Prefix'] = 'tarq_archive/'
+    #     response_iterator = paginator.paginate(**kwargs)
+    #     items += [
+    #         item['Key']
+    #         for page in response_iterator
+    #         for item in page['Contents']
+    #     ]
 
     if len(items) == 0:
         print("No work to be done")
@@ -189,6 +223,10 @@ def main(event, context):
     # to determine if the run is complete.
     array_job_id = run_info['active_run']
     if is_batch_complete(array_job_id):
+        aggregate_run(array_job_id)
+
+        # TODO: Append new entries to the scene_list
+
         print("Run with job id of {} is complete".format(array_job_id))
         run_info['active_run'] = None
         run_info['last_run'] = run_info['last_run'] + 1
@@ -197,10 +235,6 @@ def main(event, context):
             Key=RUN_INFO_KEY,
             Body=json.dumps(run_info)
         )
-
-        # TODO: Upload a new run CSV
-        # TODO: Append new entries to the scene_list
-
         return
 
     print("Run is active with job id of {}".format(array_job_id))
