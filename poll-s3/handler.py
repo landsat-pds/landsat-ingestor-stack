@@ -2,6 +2,7 @@
 import os
 import json
 import boto3
+from StringIO import StringIO
 
 # boto3.setup_default_session(profile_name='landsat', region_name='us-west-2')
 s3 = boto3.client('s3')
@@ -9,13 +10,21 @@ s3 = boto3.client('s3')
 # boto3.setup_default_session(profile_name='default', region_name='us-west-2')
 batch = boto3.client('batch')
 
-def aggregate_run(array_job_id):
+BUCKET = 'landsat-pds'
+RUN_INFO_KEY = 'run_info_dev.json'
+SCENE_LIST_KEY = 'c1/L8/scene_list_dev.gz'
+
+
+def complete_run(run_info):
     """
     After a run is complete, aggregate the results into a CSV file.
     """
+    array_job_id = run_info['active_run']
+    last_run = run_info['last_run']
+
     paginator = s3.get_paginator('list_objects_v2')
     kwargs = {
-        'Bucket': 'landsat-pds',
+        'Bucket': BUCKET,
         'EncodingType': 'url',
         'Prefix': '{}/'.format(array_job_id),
         'FetchOwner': False,
@@ -24,23 +33,47 @@ def aggregate_run(array_job_id):
             'PageSize': 1000
         }
     }
-    response_iterator = paginator.paginate(**kwargs)
     rows = []
-    for page in response_iterator:
+    for page in paginator.paginate(**kwargs):
         for item in page['Contents']:
-            if item['Key'].endswith('.csv'):
-                obj = s3.get_object(Bucket='landsat-pds', Key=item['Key'])
-                rows += [obj['Body'].read().split('\n')]
+            obj = s3.get_object(Bucket=BUCKET, Key=item['Key'])
+            rows += [obj['Body'].read().split('\n')]
 
     names, entries, _ = zip(*rows)
     csv_list = [names[0]] + list(entries)
     csv_str = "\n".join(csv_list)
 
-    print csv_str
+    print(csv_str)
 
-    # TODO: Delete objects using s3.delete_objects
-    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.delete_objects
-    # TODO: Upload run CSV file. This requires shutting down other service to avoid collisions.
+    # Delete CSV objects
+    for page in paginator.paginate(**kwargs):
+        s3.delete_objects(
+            Bucket=BUCKET,
+            Delete={
+                'Objects': [
+                    {
+                        'Key': item['Key']
+                    }
+                    for item in page['Contents']
+                ]
+            }
+        )
+
+    # Upload run CSV file
+    # TODO: This requires shutting down other service to avoid collisions.
+
+
+    # Fetch the scene_list
+    scene_list_object = s3.get_object(Bucket=BUCKET, Key='c1/L8/scene_list_dev.gz')
+    scene_list = gzip.GzipFile(
+        fileobj=StringIO(
+            scene_list_object['Body'].read())).read()
+    scene_list += ("\n".join(entries) + "\n")
+    with gzip.open('scene_list.gz', 'wb') as f:
+        f.write(scene_list)
+
+    # Upload updated scene_list.gz file.
+    # TODO: This requires shutting down other services to avoid collisions.
 
 
 def populate_queue():
@@ -63,7 +96,7 @@ def populate_queue():
 
     paginator = s3.get_paginator('list_objects_v2')
     kwargs = {
-        'Bucket': 'landsat-pds',
+        'Bucket': BUCKET,
         'EncodingType': 'url',
         'Prefix': 'tarq/',
         'FetchOwner': False,
@@ -80,16 +113,6 @@ def populate_queue():
         if item['Key'].endswith('.tar.gz')
     ]
 
-    # if len(items) < max_items:
-    #     # Check the tarq_archive directory
-    #     kwargs['Prefix'] = 'tarq_archive/'
-    #     response_iterator = paginator.paginate(**kwargs)
-    #     items += [
-    #         item['Key']
-    #         for page in response_iterator
-    #         for item in page['Contents']
-    #     ]
-
     if len(items) == 0:
         print("No work to be done")
         return
@@ -98,7 +121,7 @@ def populate_queue():
         print(item)
 
     response = s3.put_object(
-        Bucket='landsat-pds',
+        Bucket=BUCKET,
         Key='run_list.txt',
         Body='\n'.join(items),
         ACL='public-read'
@@ -116,7 +139,6 @@ def populate_queue():
     )
 
     return response['jobId']
-
 
 
 def is_batch_complete(array_job_id):
@@ -200,11 +222,10 @@ def main(event, context):
         c. Upload a list of scenes to process to S3
         d. Submit an array job to be processed by AWS Batch
     """
-    RUN_INFO_KEY = 'run_info_dev.json'
 
     # Check run state by probing run_info.json
     run_info_object = s3.get_object(
-        Bucket='landsat-pds', Key=RUN_INFO_KEY)
+        Bucket=BUCKET, Key=RUN_INFO_KEY)
     run_info = json.loads(
         run_info_object['Body'].read())
 
@@ -213,7 +234,7 @@ def main(event, context):
         run_info['active_run'] = array_job_id
         print(run_info)
         response = s3.put_object(
-            Bucket='landsat-pds',
+            Bucket=BUCKET,
             Key=RUN_INFO_KEY,
             Body=json.dumps(run_info)
         )
@@ -223,18 +244,16 @@ def main(event, context):
     # to determine if the run is complete.
     array_job_id = run_info['active_run']
     if is_batch_complete(array_job_id):
-        aggregate_run(array_job_id)
+        complete_run(run_info)
 
-        # TODO: Append new entries to the scene_list
-
-        print("Run with job id of {} is complete".format(array_job_id))
         run_info['active_run'] = None
         run_info['last_run'] = run_info['last_run'] + 1
         response = s3.put_object(
-            Bucket='landsat-pds',
+            Bucket=BUCKET,
             Key=RUN_INFO_KEY,
             Body=json.dumps(run_info)
         )
+        print("Run with job id of {} is complete".format(array_job_id))
         return
 
     print("Run is active with job id of {}".format(array_job_id))

@@ -12,12 +12,18 @@ function main() {
     filename=$(echo $key | cut -d '/' -f 2)
     product_id="${filename%%.*}"
 
+    # Move the scene to the tarq prefix to avoid making
+    # invasive changes to landsat_ingestor
+    if [ "$directory" -eq "tarq_archive"]; then
+        aws s3 mv s3://landsat-pds/${key} s3://landsat-pds/tarq/${filename} --acl public-read
+    fi
+
     python landsat_ingestor/ingestor/l8_process_scene.py \
         --verbose \
         --source s3queue \
         --overwrite \
         --list-file run.csv \
-        --no-delete-queue \
+        --no-delete-queue \ # TODO: Remove this flag when in production
         $product_id
     
     aws s3 cp run.csv s3://landsat-pds/${JOB_ID}/${product_id}.csv
