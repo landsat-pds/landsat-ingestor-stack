@@ -369,12 +369,53 @@
         ]
       }
     },
+    "IAMFleetRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "spotfleet.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "EC2Permissions",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
     "ComputeEnvironment": {
       "Type": "AWS::Batch::ComputeEnvironment",
       "Properties": {
         "Type": "MANAGED",
+        "ComputeEnvironmentName": "LandsatProcessor",
         "ComputeResources": {
-          "Type": "EC2",
+          "Type": "SPOT",
+          "SpotIamFleetRole": {
+            "Fn::GetAtt": [
+              "IAMFleetRole",
+              "Arn"
+            ]
+          },
           "BidPercentage": 40,
           "MinvCpus": 0,
           "DesiredvCpus": 0,
