@@ -1,17 +1,16 @@
 
 import os
 import json
+import gzip
 import boto3
 from StringIO import StringIO
 
-# boto3.setup_default_session(profile_name='landsat', region_name='us-west-2')
 s3 = boto3.client('s3')
-
-# boto3.setup_default_session(profile_name='default', region_name='us-west-2')
 batch = boto3.client('batch')
 
 BUCKET = 'landsat-pds'
 RUN_INFO_KEY = 'run_info_dev.json'
+RUN_LIST_KEY = 'run_list.txt'
 SCENE_LIST_KEY = 'c1/L8/scene_list_dev.gz'
 
 
@@ -60,20 +59,30 @@ def complete_run(run_info):
         )
 
     # Upload run CSV file
-    # TODO: This requires shutting down other service to avoid collisions.
-
+    # TODO: Migrate to production file
+    run_info['active_run'] = None
+    response = s3.put_object(
+        Bucket=BUCKET,
+        Key="runs_dev/{}.csv".format(last_run + 1),
+        Body=csv_str,
+        ACL='public-read'
+    )
 
     # Fetch the scene_list
-    scene_list_object = s3.get_object(Bucket=BUCKET, Key='c1/L8/scene_list_dev.gz')
-    scene_list = gzip.GzipFile(
-        fileobj=StringIO(
-            scene_list_object['Body'].read())).read()
+    # TODO: Migrate to production file
+    filepath = '/tmp/scene_list.gz'
+    s3.download_file(BUCKET, 'c1/L8/scene_list_dev.gz', filepath)
+    with gzip.open(filepath) as f:
+        scene_list = f.read()
+
     scene_list += ("\n".join(entries) + "\n")
-    with gzip.open('scene_list.gz', 'wb') as f:
+
+    with gzip.open(filepath, 'wb') as f:
         f.write(scene_list)
 
     # Upload updated scene_list.gz file.
-    # TODO: This requires shutting down other services to avoid collisions.
+    # TODO: Migrate to production file
+    response = s3.upload_file('/tmp/scene_list.gz', BUCKET, SCENE_LIST_KEY)
 
 
 def populate_queue():
@@ -95,23 +104,25 @@ def populate_queue():
     # max_items = 5000
 
     paginator = s3.get_paginator('list_objects_v2')
-    kwargs = {
-        'Bucket': BUCKET,
-        'EncodingType': 'url',
-        'Prefix': 'tarq/',
-        'FetchOwner': False,
-        'PaginationConfig': {
-            'MaxItems': max_items,
-            'PageSize': 1000
+    items = []
+    for prefix in ['tarq/', 'tarq_archive/']:
+        kwargs = {
+            'Bucket': BUCKET,
+            'EncodingType': 'url',
+            'Prefix': prefix,
+            'FetchOwner': False,
+            'PaginationConfig': {
+                'MaxItems': max_items,
+                'PageSize': 1000
+            }
         }
-    }
-    response_iterator = paginator.paginate(**kwargs)
-    items = [
-        item['Key']
-        for page in response_iterator
-        for item in page['Contents']
-        if item['Key'].endswith('.tar.gz')
-    ]
+        response_iterator = paginator.paginate(**kwargs)
+        items += [
+            item['Key']
+            for page in response_iterator
+            for item in page['Contents']
+            if item['Key'].endswith('.tar.gz')
+        ]
 
     if len(items) == 0:
         print("No work to be done")
@@ -122,7 +133,7 @@ def populate_queue():
 
     response = s3.put_object(
         Bucket=BUCKET,
-        Key='run_list.txt',
+        Key=RUN_LIST_KEY,
         Body='\n'.join(items),
         ACL='public-read'
     )
@@ -216,10 +227,10 @@ def main(event, context):
 
     For no active run:
 
-        a. Check the tarq (tarq_archive) directory on S3 for scene tarballs
-           to be processed.
+        a. Check the tarq and tarq_archive directory on S3 for
+           scene tarballs to be processed.
         b. Update the run state in run_info.json
-        c. Upload a list of scenes to process to S3
+        c. Upload a list of scenes (run_list.txt) to process to S3
         d. Submit an array job to be processed by AWS Batch
     """
 
@@ -236,7 +247,8 @@ def main(event, context):
         response = s3.put_object(
             Bucket=BUCKET,
             Key=RUN_INFO_KEY,
-            Body=json.dumps(run_info)
+            Body=json.dumps(run_info),
+            ACL='public-read'
         )
         return
 
@@ -251,7 +263,8 @@ def main(event, context):
         response = s3.put_object(
             Bucket=BUCKET,
             Key=RUN_INFO_KEY,
-            Body=json.dumps(run_info)
+            Body=json.dumps(run_info),
+            ACL='public-read'
         )
         print("Run with job id of {} is complete".format(array_job_id))
         return
