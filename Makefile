@@ -58,6 +58,8 @@ processor-cloudformation:
 		--parameters \
 			ParameterKey=Name,ParameterValue=$(PROCESSOR_STACK_NAME) \
 			ParameterKey=Owner,ParameterValue=$(OWNER) \
+			ParameterKey=AccessKeyId,ParameterValue=$(LANDSAT_PDS_ACCESS_KEY_ID) \
+			ParameterKey=SecretAccessKey,ParameterValue=$(LANDSAT_PDS_SECRET_ACCESS_KEY) \
 		--capabilities CAPABILITY_IAM \
 		--region us-west-2 \
 		--profile prod

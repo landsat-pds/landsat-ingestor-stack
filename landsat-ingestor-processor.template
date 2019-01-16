@@ -9,6 +9,14 @@
     "Owner": {
       "Description": "Owner of this application within an organization.",
       "Type": "String"
+    },
+    "AccessKeyId": {
+      "Description": "Keys that have permissions to interface with s3://landsat-pds.",
+      "Type": "String"
+    },
+    "SecretAccessKey": {
+      "Description": "Keys that have permissions to interface with s3://landsat-pds.",
+      "Type": "String"
     }
   },
   "Resources": {
@@ -140,13 +148,7 @@
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Action": [
-                    "s3:ListBucket",
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:PutObjectAcl",
-                    "s3:DeleteObject"
-                  ],
+                  "Action": "*",
                   "Resource": [
                     "arn:aws:s3:::landsat-pds",
                     "arn:aws:s3:::landsat-pds/*"
@@ -184,13 +186,7 @@
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Action": [
-                    "s3:GetObject",
-                    "s3:GetObjectVersion",
-                    "s3:PutObject",
-                    "s3:PutObjectAcl",
-                    "s3:DeleteObject"
-                  ],
+                  "Action": "*",
                   "Resource": [
                     "arn:aws:s3:::landsat-pds",
                     "arn:aws:s3:::landsat-pds/*"
@@ -328,6 +324,20 @@
       "Properties": {
         "Type": "container",
         "ContainerProperties": {
+          "Environment": [
+            {
+              "Name": "AWS_ACCESS_KEY_ID",
+              "Value": {
+                "Ref": "AccessKeyId"
+              }
+            },
+            {
+              "Name": "AWS_SECRET_ACCESS_KEY",
+              "Value": {
+                "Ref": "SecretAccessKey"
+              }
+            }
+          ],
           "Image": {
             "Fn::Join": [
               "",
