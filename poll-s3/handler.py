@@ -3,15 +3,14 @@ import os
 import json
 import gzip
 import boto3
-from StringIO import StringIO
 
 s3 = boto3.client('s3')
 batch = boto3.client('batch')
 
 BUCKET = 'landsat-pds'
-RUN_INFO_KEY = 'run_info_dev.json'
+RUN_INFO_KEY = 'run_info.json'
 RUN_LIST_KEY = 'run_list.txt'
-SCENE_LIST_KEY = 'c1/L8/scene_list_dev.gz'
+SCENE_LIST_KEY = 'c1/L8/scene_list.gz'
 
 
 def complete_run(run_info):
@@ -44,6 +43,31 @@ def complete_run(run_info):
 
     print(csv_str)
 
+    # Upload run CSV file
+    # TODO: Migrate to production file
+    run_info['active_run'] = None
+    response = s3.put_object(
+        Bucket=BUCKET,
+        Key="runs_dev/{}.csv".format(last_run + 1),
+        Body=csv_str,
+        ACL='public-read'
+    )
+
+    # Fetch the scene_list
+    filepath = '/tmp/scene_list.gz'
+    s3.download_file(BUCKET, SCENE_LIST_KEY, filepath)
+    with gzip.open(filepath) as f:
+        scene_list = f.read()
+
+    scene_list += ("\n".join(entries) + "\n")
+
+    with gzip.open(filepath, 'wb') as f:
+        f.write(scene_list)
+
+    # Upload updated scene_list.gz file.
+    response = s3.upload_file(
+        '/tmp/scene_list.gz', BUCKET, SCENE_LIST_KEY, ExtraArgs={'ACL':'public-read'})
+
     # Delete CSV objects
     for page in paginator.paginate(**kwargs):
         s3.delete_objects(
@@ -57,32 +81,6 @@ def complete_run(run_info):
                 ]
             }
         )
-
-    # Upload run CSV file
-    # TODO: Migrate to production file
-    run_info['active_run'] = None
-    response = s3.put_object(
-        Bucket=BUCKET,
-        Key="runs_dev/{}.csv".format(last_run + 1),
-        Body=csv_str,
-        ACL='public-read'
-    )
-
-    # Fetch the scene_list
-    # TODO: Migrate to production file
-    filepath = '/tmp/scene_list.gz'
-    s3.download_file(BUCKET, 'c1/L8/scene_list_dev.gz', filepath)
-    with gzip.open(filepath) as f:
-        scene_list = f.read()
-
-    scene_list += ("\n".join(entries) + "\n")
-
-    with gzip.open(filepath, 'wb') as f:
-        f.write(scene_list)
-
-    # Upload updated scene_list.gz file.
-    # TODO: Migrate to production file
-    response = s3.upload_file('/tmp/scene_list.gz', BUCKET, SCENE_LIST_KEY)
 
 
 def populate_queue():
@@ -100,8 +98,7 @@ def populate_queue():
               done, this function will fallback to s3://landsat-pds/tarq_archive
               to process the backlog.
     """
-    max_items = 4
-    # max_items = 5000
+    max_items = 100
 
     paginator = s3.get_paginator('list_objects_v2')
     items = []
