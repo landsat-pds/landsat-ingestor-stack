@@ -354,7 +354,7 @@
             ]
           },
           "Vcpus": 1,
-          "Memory": 500,
+          "Memory": 1024,
           "Command": []
         },
         "Timeout": {
@@ -430,6 +430,7 @@
           "MinvCpus": 0,
           "DesiredvCpus": 0,
           "MaxvCpus": 64,
+          "ImageId": "ami-0c261f5198170a965",
           "InstanceTypes": [
             "optimal"
           ],
