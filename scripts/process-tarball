@@ -23,10 +23,17 @@ function main() {
         --source s3queue \
         --overwrite \
         --list-file run.csv \
+        --no-delete-queue \
         $product_id
     
     aws s3 cp run.csv s3://landsat-pds/${JOB_ID}/${product_id}.csv
     cat run.csv
+
+    # Clean up after the run CSV has been uploaded
+    rm -rf $product_id
+    rm -f $filename
+    rm run.csv
+    aws s3 rm s3://landsat-pds/tarq/${filename}
 }
 
 main
