@@ -24,8 +24,8 @@
       "Type": "AWS::Events::Rule",
       "Properties": {
         "Description": "This event periodically triggers a Lambda function that is responsible orchestrating the processing of Landsat scenes.",
-        "ScheduleExpression": "rate(15 minutes)",
-        "State": "DISABLED",
+        "ScheduleExpression": "rate(10 minutes)",
+        "State": "ENABLED",
         "Targets": [
           {
             "Arn": {
