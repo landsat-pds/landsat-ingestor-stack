@@ -44,11 +44,10 @@ def complete_run(run_info):
     print(csv_str)
 
     # Upload run CSV file
-    # TODO: Migrate to production file
     run_info['active_run'] = None
     response = s3.put_object(
         Bucket=BUCKET,
-        Key="runs_dev/{}.csv".format(last_run + 1),
+        Key="runs/{}.csv".format(last_run + 1),
         Body=csv_str,
         ACL='public-read'
     )
@@ -98,7 +97,7 @@ def populate_queue():
               done, this function will fallback to s3://landsat-pds/tarq_archive
               to process the backlog.
     """
-    max_items = 100
+    max_items = 5000
 
     paginator = s3.get_paginator('list_objects_v2')
     items = []
