@@ -68,7 +68,7 @@
           "Ref": "Name"
         },
         "Handler": "handler.main",
-        "MemorySize": 256,
+        "MemorySize": 1024,
         "Role": {
           "Fn::GetAtt": [
             "LambdaExecutionRole",
@@ -428,11 +428,11 @@
           },
           "BidPercentage": 40,
           "MinvCpus": 0,
-          "DesiredvCpus": 0,
-          "MaxvCpus": 64,
+          "DesiredvCpus": 2500,
+          "MaxvCpus": 2500,
           "ImageId": "ami-0c261f5198170a965",
           "InstanceTypes": [
-            "optimal"
+            "c4.large", "m4.large"
           ],
           "Subnets": [
             {
