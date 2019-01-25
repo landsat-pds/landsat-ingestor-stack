@@ -117,7 +117,7 @@ def populate_queue():
             if 'Contents' in page:
                 for item in page['Contents']:
                     if item['Key'].endswith('.tar.gz'):
-                        item += item['Key']
+                        items.append(item['Key'])
 
     if len(items) == 0:
         print("No work to be done")
