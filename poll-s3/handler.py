@@ -113,12 +113,11 @@ def populate_queue():
             }
         }
         response_iterator = paginator.paginate(**kwargs)
-        items += [
-            item['Key']
-            for page in response_iterator
-            for item in page['Contents']
-            if item['Key'].endswith('.tar.gz')
-        ]
+        for page in response_iterator:
+            if 'Contents' in page:
+                for item in page['Contents']:
+                    if item['Key'].endswith('.tar.gz'):
+                        item += item['Key']
 
     if len(items) == 0:
         print("No work to be done")
