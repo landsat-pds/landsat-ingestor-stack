@@ -1,0 +1,479 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Process Landsat 8 scenes that are queued on S3.",
+  "Parameters": {
+    "Name": {
+      "Description": "Name used throughout the Cloudformation stack for various resource (e.g. Lambda Function, SQS).",
+      "Type": "String"
+    },
+    "Owner": {
+      "Description": "Owner of this application within an organization.",
+      "Type": "String"
+    },
+    "AccessKeyId": {
+      "Description": "Keys that have permissions to interface with s3://landsat-pds.",
+      "Type": "String"
+    },
+    "SecretAccessKey": {
+      "Description": "Keys that have permissions to interface with s3://landsat-pds.",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "ScheduledRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Description": "This event periodically triggers a Lambda function that is responsible orchestrating the processing of Landsat scenes.",
+        "ScheduleExpression": "rate(10 minutes)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "LandsatProcessorLambda",
+                "Arn"
+              ]
+            },
+            "Id": "TargetFunction"
+          }
+        ]
+      }
+    },
+    "PermissionForEventsToInvokeLambda": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "LandsatProcessorLambda"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ScheduledRule",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "LandsatProcessorLambda": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": "LambdaExecutionRole",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "pl-amit",
+          "S3Key": "lambda/poll-s3.zip"
+        },
+        "Description": "Distribute a run to AWS Batch and aggregate results when work is complete.",
+        "FunctionName": {
+          "Ref": "Name"
+        },
+        "Handler": "handler.main",
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaExecutionRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "python2.7",
+        "Timeout": 600,
+        "Environment": {
+          "Variables": {
+            "AWS_BATCH_JOB_QUEUE": {
+              "Ref": "JobQueue"
+            },
+            "AWS_BATCH_JOB_DEFINITION": {
+              "Ref": "JobDefinition"
+            }
+          }
+        }
+      }
+    },
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "LandsatProcessorLambdaLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "LandsatProcessorBatch",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "batch:SubmitJob",
+                    "batch:ListJobs"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "LandsatPDSBucket",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": [
+                    "arn:aws:s3:::landsat-pds",
+                    "arn:aws:s3:::landsat-pds/*"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "InstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "LandsatPDSBucket",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": [
+                    "arn:aws:s3:::landsat-pds",
+                    "arn:aws:s3:::landsat-pds/*"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16"
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "RouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "VPCGatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "EC2 Security Group for instances launched in the VPC by Batch",
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "Subnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "MapPublicIpOnLaunch": "True"
+      }
+    },
+    "Route": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "SubnetRouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "SubnetId": {
+          "Ref": "Subnet"
+        }
+      }
+    },
+    "BatchServiceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "batch.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+        ]
+      }
+    },
+    "IamInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "EcsInstanceRole"
+          }
+        ]
+      }
+    },
+    "EcsInstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Sid": "",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+        ]
+      }
+    },
+    "JobDefinition": {
+      "Type": "AWS::Batch::JobDefinition",
+      "Properties": {
+        "Type": "container",
+        "ContainerProperties": {
+          "Environment": [
+            {
+              "Name": "AWS_ACCESS_KEY_ID",
+              "Value": {
+                "Ref": "AccessKeyId"
+              }
+            },
+            {
+              "Name": "AWS_SECRET_ACCESS_KEY",
+              "Value": {
+                "Ref": "SecretAccessKey"
+              }
+            }
+          ],
+          "Image": {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "AWS::AccountId"
+                },
+                ".dkr.ecr.",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ".amazonaws.com/awsbatch:latest"
+              ]
+            ]
+          },
+          "Vcpus": 1,
+          "Memory": 1024,
+          "Command": []
+        },
+        "Timeout": {
+          "AttemptDurationSeconds": 800
+        },
+        "RetryStrategy": {
+          "Attempts": 3
+        }
+      }
+    },
+    "JobQueue": {
+      "Type": "AWS::Batch::JobQueue",
+      "Properties": {
+        "Priority": 1,
+        "ComputeEnvironmentOrder": [
+          {
+            "Order": 1,
+            "ComputeEnvironment": {
+              "Ref": "ComputeEnvironment"
+            }
+          }
+        ]
+      }
+    },
+    "IAMFleetRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "spotfleet.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "EC2Permissions",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ComputeEnvironment": {
+      "Type": "AWS::Batch::ComputeEnvironment",
+      "Properties": {
+        "Type": "MANAGED",
+        "ComputeEnvironmentName": "LandsatProcessor",
+        "ComputeResources": {
+          "Type": "SPOT",
+          "SpotIamFleetRole": {
+            "Fn::GetAtt": [
+              "IAMFleetRole",
+              "Arn"
+            ]
+          },
+          "BidPercentage": 40,
+          "MinvCpus": 0,
+          "DesiredvCpus": 2500,
+          "MaxvCpus": 2500,
+          "ImageId": "ami-0c261f5198170a965",
+          "InstanceTypes": [
+            "c4.large", "m4.large"
+          ],
+          "Subnets": [
+            {
+              "Ref": "Subnet"
+            }
+          ],
+          "SecurityGroupIds": [
+            {
+              "Ref": "SecurityGroup"
+            }
+          ],
+          "InstanceRole": {
+            "Ref": "IamInstanceProfile"
+          },
+          "Tags": {
+            "Owner": {
+              "Ref": "Owner"
+            }
+          }
+        },
+        "ServiceRole": {
+          "Ref": "BatchServiceRole"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ComputeEnvironmentArn": {
+      "Value": {
+        "Ref": "ComputeEnvironment"
+      }
+    },
+    "JobQueueArn": {
+      "Value": {
+        "Ref": "JobQueue"
+      }
+    },
+    "JobDefinitionArn": {
+      "Value": {
+        "Ref": "JobDefinition"
+      }
+    }
+  }
+}

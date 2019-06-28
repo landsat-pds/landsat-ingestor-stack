@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -eou pipefail
+
+function main() {
+    wget -O run_list.txt https://landsat-pds.s3.amazonaws.com/run_list.txt
+    INDEX=$((AWS_BATCH_JOB_ARRAY_INDEX+1))
+    JOB_ID=$(echo $AWS_BATCH_JOB_ID | cut -d ':' -f 1)
+    key=$(sed "${INDEX}q;d" run_list.txt)
+    echo "Processing ${key} from job ${AWS_BATCH_JOB_ARRAY_INDEX} in ${AWS_BATCH_JOB_ID}"
+
+    directory=$(echo $key | cut -d '/' -f 1)
+    filename=$(echo $key | cut -d '/' -f 2)
+    product_id="${filename%%.*}"
+
+    # Move the scene to the tarq prefix to avoid making
+    # invasive changes to landsat_ingestor
+    if [ "$directory" == "tarq_archive" ]; then
+        aws s3 mv s3://landsat-pds/${key} s3://landsat-pds/tarq/${filename} --acl public-read
+    fi
+
+    python landsat_ingestor/ingestor/l8_process_scene.py \
+        --verbose \
+        --source s3queue \
+        --overwrite \
+        --list-file run.csv \
+        --no-delete-queue \
+        $product_id
+    
+    aws s3 cp run.csv s3://landsat-pds/${JOB_ID}/${product_id}.csv
+    cat run.csv
+
+    # Clean up after the run CSV has been uploaded
+    rm -rf $product_id
+    rm -f $filename
+    rm run.csv
+    aws s3 rm s3://landsat-pds/tarq/${filename}
+}
+
+main
+
+exit 0
