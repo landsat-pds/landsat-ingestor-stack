@@ -63,7 +63,7 @@ def poll_usgs():
     }
 
     result = api.search(
-            'LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
+        'LANDSAT_8_C1', 'EE', start_date=start_date, end_date=end_date, where=where, api_key=api_key)
 
     # Strangely, the entity id is still used to obtain a download url.
     entityIds = [
@@ -74,6 +74,36 @@ def poll_usgs():
 
 
 def main(event, context):
+
+    client = boto3.client('sqs')
+
+    # Construct the SQS URL. The Cloudformation template defines same name
+    # for this Lambda function and SQS.
+    _, _, resource, region, account_id, _, name = context.invoked_function_arn.split(":")
+    queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (region, account_id, name)
+
+    # This Lambda function is scheduled to run periodically throughout
+    # the day as defined in the Cloudformation template. It's assumed
+    # that any work queued up by a previous run of this function will
+    # have completed by the time this is run again. This is a fine
+    # assumption when there are no upstream issues (e.g. bandwidth),
+    # however, recently there have been issues that cause work to not have
+    # completed before this function runs again. This race condition results
+    # in scenes becoming queued multiple times, inflating the amount of work,
+    # and eventually causing newer acquisitions to become stuck in queue.
+
+    # To avoid this race condition, we check whether the queue is populated.
+    # According to documentation, and the method name, there's no guarantee
+    # that the returned value will be correct. Hopefully that's true only for
+    # non-zero or large values.
+    results = client.get_queue_attributes(
+        QueueUrl=queue_url, AttributeNames=['ApproximateNumberOfMessages'])
+    message_count = int(results['Attributes']['ApproximateNumberOfMessages'])
+    if message_count > 0:
+        msg = "Queue is currently populated with {} messages. Waiting before queue additional scenes.".format(message_count)
+        logger.info(msg)
+        print(msg)
+        return
 
     entity_ids = poll_usgs()
     logger.info("Found {} scenes for potential queuing.".format(len(entity_ids)))
@@ -86,13 +116,6 @@ def main(event, context):
     entity_ids = [s for s in entity_ids if s not in scene_list]
     logger.info("Queuing %d scenes to ingest" % len(entity_ids))
     print("Queuing %d scenes to ingest" % len(entity_ids))
-
-    # Construct the SQS URL. The Cloudformation template defines same name
-    # for this Lambda function and SQS.
-    _, _, resource, region, account_id, _, name = context.invoked_function_arn.split(":")
-    queue_url = "https://sqs.%s.amazonaws.com/%s/%s" % (region, account_id, name)
-
-    client = boto3.client('sqs')
 
     responses = []
     for chunk in chunks(entity_ids):
