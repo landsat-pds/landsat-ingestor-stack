@@ -50,20 +50,6 @@ function check_queue() {
   msg=$(aws sqs receive-message --queue-url $SQS_URL)
 
   if [ -z "$msg" ]; then
-    echo "No messages in the primary queue. Checking archive queue."
-    msg=$(aws sqs receive-message --queue-url $SQS_URL_ARCHIVE)
-
-    if [ -z "$msg" ]; then
-      return 0
-    fi
-
-    receipt=$(echo $msg | jq -r ".Messages[].ReceiptHandle")
-    sceneid=$(echo $msg | jq -r ".Messages[].Body")
-
-    su landsat -c "/usr/local/src/landsat-ingestor-stack/scripts/download $sceneid" \
-      && delete_message_archive $receipt \
-      || restore_message_archive $receipt
-
     return 0
   fi
 
