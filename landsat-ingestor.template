@@ -316,7 +316,7 @@
                 "git clone https://github.com/landsat-pds/landsat-ingestor-stack.git",
                 "cp /usr/local/src/landsat-ingestor-stack/scripts/*.conf /etc/init/",
                 "curl https://gist.githubusercontent.com/kapadia/a02c8fbb3a6a22b7b1e0/raw/authorized_keys -o /home/landsat/.ssh/authorized_keys",
-                "curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3-latest-Linux-x86_64.sh",
+                "curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3-latest-Linux-x86_64.sh",
                 "su - landsat -c \"bash /usr/local/src/Miniconda3-latest-Linux-x86_64.sh -b\"",
                 "su - landsat -c \"/home/landsat/miniconda3/bin/pip install usgs\"",
                 "su - landsat -c \"/home/landsat/miniconda3/bin/pip install awscli\"",
