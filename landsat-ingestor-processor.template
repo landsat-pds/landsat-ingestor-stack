@@ -23,7 +23,7 @@
     "ScheduledRule": {
       "Type": "AWS::Events::Rule",
       "Properties": {
-        "Description": "This event periodically triggers a Lambda function that is responsible orchestrating the processing of Landsat scenes.",
+        "Description": "This event periodically triggers a Lambda function that is responsible for orchestrating the processing of Landsat scenes.",
         "ScheduleExpression": "rate(10 minutes)",
         "State": "ENABLED",
         "Targets": [
@@ -68,7 +68,7 @@
           "Ref": "Name"
         },
         "Handler": "handler.main",
-        "MemorySize": 1024,
+        "MemorySize": 2048,
         "Role": {
           "Fn::GetAtt": [
             "LambdaExecutionRole",
@@ -238,7 +238,8 @@
     "Subnet": {
       "Type": "AWS::EC2::Subnet",
       "Properties": {
-        "CidrBlock": "10.0.0.0/24",
+        "AvailabilityZone" : "us-west-2a",
+        "CidrBlock": "10.0.0.0/16",
         "VpcId": {
           "Ref": "VPC"
         },
@@ -426,10 +427,10 @@
               "Arn"
             ]
           },
-          "BidPercentage": 40,
+          "BidPercentage": 10,
           "MinvCpus": 0,
-          "DesiredvCpus": 2500,
-          "MaxvCpus": 2500,
+          "DesiredvCpus": 200,
+          "MaxvCpus": 200,
           "ImageId": "ami-0c261f5198170a965",
           "InstanceTypes": [
             "c4.large", "m4.large"
