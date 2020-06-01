@@ -239,11 +239,17 @@
       "Type": "AWS::EC2::Subnet",
       "Properties": {
         "AvailabilityZone" : "us-west-2a",
-        "CidrBlock": "10.0.0.0/16",
+        "CidrBlock": "10.0.0.0/19",
         "VpcId": {
           "Ref": "VPC"
         },
-        "MapPublicIpOnLaunch": "True"
+        "MapPublicIpOnLaunch": "True",
+        "Tags": [
+          {
+            "Key": "owner",
+            "Value": "amitkapadia"
+          }
+        ]
       }
     },
     "Route": {
@@ -427,7 +433,7 @@
               "Arn"
             ]
           },
-          "BidPercentage": 10,
+          "BidPercentage": 80,
           "MinvCpus": 0,
           "DesiredvCpus": 200,
           "MaxvCpus": 200,
