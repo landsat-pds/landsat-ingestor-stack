@@ -22,8 +22,16 @@ fi
 
 
 function onerror() {
+  # The behavior of authentication against the usgs api appears to have changed
+  # since the June 2020 maintenance. Attempt to login again
   rm -f /mnt/entityid.tar.gz
+  rm -f $HOME/.usgs
   sleep $[ $RANDOM % 10 + 10]s
+  # Login only if the file does not exist.
+  if [ ! -f "$HOME/.usgs" ]; then
+    touch $HOME/.usgs
+    usgs login
+  fi
   exit 1
 }
 trap onerror EXIT
