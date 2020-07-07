@@ -12,10 +12,10 @@ function usage() {
 }
 
 
-entityid=${1:-}
+productid=${1:-}
 
 
-if [[ -z $entityid ]]; then
+if [[ -z $productid ]]; then
   usage;
   exit 1;
 fi
@@ -24,49 +24,38 @@ fi
 function onerror() {
   # The behavior of authentication against the usgs api appears to have changed
   # since the June 2020 maintenance. Attempt to login again
-  rm -f /mnt/entityid.tar.gz
-  rm -f $HOME/.usgs
+  rm -f /mnt/productid.tar.gz
   sleep $[ $RANDOM % 10 + 10]s
-  # Login only if the file does not exist.
-  if [ ! -f "$HOME/.usgs" ]; then
-    touch $HOME/.usgs
-    usgs login
-  fi
   exit 1
 }
 trap onerror EXIT
  
  
 function download_landsat() {
-  local entityid=$1
+  local productid=$1
 
-  url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0].url")
-  productid=$(echo "${url##*/}" | cut -d '.' -f1)
+  pathrow=$(echo $productid | cut -d '_' -f3)
+  datestr=$(echo $productid | cut -d '_' -f4)
+
+  path=${pathrow:0:3}
+  row=${pathrow:3:6}
+  year=${datestr:0:4}
+
+  url="https://dds.cr.usgs.gov/highvolume/landsat_8/RT/${year}/${path}/${row}/${productid}.tar.gz"
   dstpath=/mnt/$productid.tar.gz
 
-  echo "Downloading $entityid from $url"
+  echo "Downloading $productid from $url"
   t0=$(date +%s)
-  curl --silent --fail "$url" -o "$dstpath"
+  curl --silent --fail --user ${USGS_USERNAME}:${USGS_PASSWORD} "$url" -o "$dstpath"
   t1=$(date +%s)
-  echo "Took $(($t1 - $t0)) seconds to download $entityid"
+  echo "Took $(($t1 - $t0)) seconds to download $productid"
 
-  # Drop archive into a different queue directory
-  # as a workaround of some internal issues
-  acquisition_date=$(echo $productid | cut -d '_' -f4)
-  acquisition_year=${acquisition_date:0:4}
-
-  if [ "$acquisition_year" -gt 2017 ]; then
-    echo "Copying $entityid to s3://landsat-pds/tarq/"
-    aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
-  else
-    echo "Copying $entityid to s3://landsat-pds/tarq_archive/"
-    aws s3 cp $dstpath s3://landsat-pds/tarq_archive/ --acl public-read
-  fi
-
+  echo "Copying $productid to s3://landsat-pds/tarq/"
+  aws s3 cp $dstpath s3://landsat-pds/tarq/ --acl public-read
   rm -f $dstpath
 }
  
-download_landsat $entityid
+download_landsat $productid
  
 trap - EXIT
 exit 0

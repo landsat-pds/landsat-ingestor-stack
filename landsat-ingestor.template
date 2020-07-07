@@ -314,6 +314,7 @@
                 "git clone https://github.com/mapbox/commonsec.git",
                 "bash /usr/local/src/commonsec/bin/setup.bash -p 22 -u landsat",
                 "git clone https://github.com/landsat-pds/landsat-ingestor-stack.git",
+                "git checkout backlog",
                 "cp /usr/local/src/landsat-ingestor-stack/scripts/*.conf /etc/init/",
                 "curl https://gist.githubusercontent.com/kapadia/a02c8fbb3a6a22b7b1e0/raw/authorized_keys -o /home/landsat/.ssh/authorized_keys",
                 "curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o Miniconda3-latest-Linux-x86_64.sh",
@@ -374,22 +375,6 @@
                     ]
                   ]
                 },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "su - landsat -c \"/home/landsat/miniconda3/bin/usgs login ",
-                      {
-                        "Ref": "USGSUsername"
-                      },
-                      " ",
-                      {
-                        "Ref": "USGSPassword"
-                      },
-                      "\""
-                    ]
-                  ]
-                },
                 "chown landsat /mnt",
                 "start queue"
               ]
@@ -410,7 +395,7 @@
           "Ref": "LaunchConfiguration"
         },
         "MinSize": "0",
-        "MaxSize": "5",
+        "MaxSize": "10",
         "Tags": [
           {
             "Key": "Name",
