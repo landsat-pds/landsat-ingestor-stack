@@ -41,7 +41,7 @@ function download_landsat() {
   row=${pathrow:3:6}
   year=${datestr:0:4}
 
-  url="https://dds.cr.usgs.gov/highvolume/landsat_8/RT/${year}/${path}/${row}/${productid}.tar.gz"
+  url="https://dds.cr.usgs.gov/highvolume/landsat_8/${TIER}/${year}/${path}/${row}/${productid}.tar.gz"
   dstpath=/mnt/$productid.tar.gz
 
   echo "Downloading $productid from $url"
