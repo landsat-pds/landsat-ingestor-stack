@@ -394,7 +394,7 @@
           "Ref": "LaunchConfiguration"
         },
         "MinSize": "0",
-        "MaxSize": "10",
+        "MaxSize": "20",
         "Tags": [
           {
             "Key": "Name",
@@ -427,7 +427,7 @@
         "AutoScalingGroupName": {
           "Ref": "AutoScalingGroup"
         },
-        "ScalingAdjustment": "5"
+        "ScalingAdjustment": "20"
       }
     },
     "WorkerScaleDownPolicy": {
