@@ -46,7 +46,7 @@ function download_landsat() {
 
   echo "Downloading $entityid from $url"
   t0=$(date +%s)
-  curl --silent --fail "$url" -o "$dstpath"
+  curl --silent --fail --location "$url" -o "$dstpath"
   t1=$(date +%s)
   echo "Took $(($t1 - $t0)) seconds to download $entityid"
 
