@@ -308,7 +308,7 @@
                 "set -ex",
                 "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1",
                 "apt-get update",
-                "apt-get -y --force-yes install git curl parallel jq htop",
+                "apt-get -y --force-yes install git curl parallel jq ack-grep htop",
                 "mkdir -p /usr/local/src/ && cd /usr/local/src/",
                 "echo -e \"Host github.com\n\tStrictHostKeyChecking no\n\" >> ~/.ssh/config",
                 "git clone https://github.com/mapbox/commonsec.git",
@@ -374,6 +374,7 @@
                     ]
                   ]
                 },
+                "sleep $[ $RANDOM % 10 + 10 ]s",
                 {
                   "Fn::Join": [
                     "",

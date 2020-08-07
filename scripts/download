@@ -41,14 +41,17 @@ function download_landsat() {
   local entityid=$1
 
   url=$(usgs download-url --node EE LANDSAT_8_C1 $entityid --product STANDARD | jq -r ".data[0].url")
-  productid=$(echo "${url##*/}" | cut -d '.' -f1)
-  dstpath=/mnt/$productid.tar.gz
 
   echo "Downloading $entityid from $url"
   t0=$(date +%s)
-  curl --fail --location "$url" -o "$dstpath"
+  cd /mnt
+  output=$(curl --fail --location "$url" --remote-header-name -O)
+  cd -
   t1=$(date +%s)
   echo "Took $(($t1 - $t0)) seconds to download $entityid"
+
+  productid=$(echo $output | ack '(?P<productid>L[A-Z0-9_]*).tar.gz' --output $+{productid})
+  dstpath=/mnt/${productid}.tar.gz
 
   # Drop archive into a different queue directory
   # as a workaround of some internal issues
