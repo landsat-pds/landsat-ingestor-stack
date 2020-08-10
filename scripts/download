@@ -22,9 +22,17 @@ fi
 
 
 function onerror() {
-  # The behavior of authentication against the usgs api appears to have changed
+  # Changes to the USGS API in July/August 2020 requires receiving an ephemeral
+  # url. The filename/product id is hidden in the response header. Since the
+  # product id is not as readily available, parse the path/row and date from the
+  # entity id, and delete the file using wildcards.
+  pathrow=${entityid:3:6}
+  year_doy=${entityid:9:7}
+  date_str=$(python -c "from datetime import datetime; print(datetime.strptime('$year_doy', '%Y%j').strftime('%Y%m%d'))")
+  rm -rf /mnt/LC08_*_${pathrow}_${date_str}_*.tar.gz
+
+  # The behavior of authentication against the USGS API appears to have changed
   # since the June 2020 maintenance. Attempt to login again
-  rm -f /mnt/entityid.tar.gz
   rm -f $HOME/.usgs
   sleep $[ $RANDOM % 10 + 10]s
   # Login only if the file does not exist.
@@ -35,7 +43,6 @@ function onerror() {
   exit 1
 }
 trap onerror EXIT
- 
  
 function download_landsat() {
   local entityid=$1
