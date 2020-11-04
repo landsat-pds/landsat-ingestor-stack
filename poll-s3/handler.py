@@ -33,15 +33,19 @@ def complete_run(run_info):
     }
     rows = []
     for page in paginator.paginate(**kwargs):
+        if 'Contents' not in page:
+            continue
         for item in page['Contents']:
             obj = s3.get_object(Bucket=BUCKET, Key=item['Key'])
             rows += [obj['Body'].read().split('\n')]
 
+    if len(rows) == 0:
+        return
+
     names, entries, _ = zip(*rows)
     csv_list = [names[0]] + list(entries)
     csv_str = "\n".join(csv_list)
-
-    print(csv_str)
+    return
 
     # Upload run CSV file
     run_info['active_run'] = None
